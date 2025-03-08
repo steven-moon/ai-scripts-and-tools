@@ -297,7 +297,7 @@ By default, the script ignores common patterns like:
 #### Command Line Options
 
 ```bash
-generate-code-summary [options] [output-file]
+code-summary [options] [output-file]
 ```
 
 Available options:
@@ -311,22 +311,22 @@ If no output file is specified, it will create a summary.md file in the current 
 
 ```bash
 # Generate a basic summary in summary.md
-generate-code-summary
+code-summary
 
 # Generate summary with file contents included
-generate-code-summary -d
+code-summary -d
 
 # Generate summary and copy to clipboard
-generate-code-summary -c
+code-summary -c
 
 # Run in interactive mode with prompts
-generate-code-summary -i
+code-summary -i
 
 # Specify a custom output file
-generate-code-summary output.md
+code-summary output.md
 
 # Combine options
-generate-code-summary -d -c my-project-summary.md
+code-summary -d -c my-project-summary.md
 ```
 
 #### Interactive Mode

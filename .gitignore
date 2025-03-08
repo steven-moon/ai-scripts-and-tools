@@ -13,6 +13,9 @@ build/
 out/
 *.js.map
 
+# Summary files
+summary.md
+
 # IDE and editor files
 .idea/
 .vscode/*

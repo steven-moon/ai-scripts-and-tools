@@ -1,18 +1,19 @@
 #!/usr/bin/env ts-node
 
 /**
- * generate-code-summary.ts
+ * Code Summary Generator
+ * code-summary.ts
  * 
- * This script generates a text summary of all files in the current directory and subdirectories.
- * It respects .gitignore patterns and can be configured with additional ignore patterns.
+ * Generates a summary of all code files in a project
  * 
  * Usage:
- *   generate-code-summary [options] [output-file]
+ * 
+ *   code-summary [options] [output-file]
  * 
  * Options:
- *   -d, --details    Include full text of each file in the output
+ *   -d, --details    Include the full text of each file in the output
  *   -c, --clipboard  Copy the output to clipboard instead of saving to a file
- *   -i, --interactive  Run in interactive mode with prompts
+ *   -i, --interactive Run in interactive mode with prompts
  * 
  * If no output file is specified, it will create a summary.md file in the current directory.
  */
