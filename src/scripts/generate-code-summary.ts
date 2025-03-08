@@ -308,8 +308,14 @@ const getOutputPreference = async (defaultFile: string): Promise<{ toFile: boole
 // Main function to generate code summary
 const generateCodeSummary = async (): Promise<void> => {
   const options = parseArgs();
-  const currentDir = process.cwd();
+  
+  // Store the original working directory where the script was called from
+  const originalCwd = process.env.ORIGINAL_CWD || process.cwd();
+  const currentDir = originalCwd;
   const defaultOutputFile = path.join(currentDir, 'summary.md');
+  
+  // Log the working directory to help with debugging
+  console.log(`Working directory for code summary: ${originalCwd}`);
   
   let outputToFile = !options.copyToClipboard;
   let outputToClipboard = options.copyToClipboard;
@@ -349,14 +355,24 @@ const generateCodeSummary = async (): Promise<void> => {
   console.log(`Added ${customPatterns.length} custom ignore patterns`);
   ignoreRules.add(customPatterns);
   
+  // Helper function to run commands in the original directory
+  const runCommandInOriginalDir = (command: string): string => {
+    try {
+      return runCommand(`cd "${originalCwd}" && ${command}`);
+    } catch (error) {
+      console.error(`Error running command: ${error}`);
+      return '';
+    }
+  };
+  
   // Generate repository info
   let repoInfo = '';
   try {
-    const gitStatus = runCommand('git rev-parse --is-inside-work-tree 2>/dev/null');
+    const gitStatus = runCommandInOriginalDir('git rev-parse --is-inside-work-tree 2>/dev/null');
     if (gitStatus === 'true') {
-      const repoName = runCommand('basename -s .git `git config --get remote.origin.url` 2>/dev/null || echo "Local Repository"');
-      const branch = runCommand('git branch --show-current 2>/dev/null || echo "unknown"');
-      const lastCommit = runCommand('git log -1 --pretty=format:"%h - %s (%cr)" 2>/dev/null || echo "No commits"');
+      const repoName = runCommandInOriginalDir('basename -s .git `git config --get remote.origin.url` 2>/dev/null || echo "Local Repository"');
+      const branch = runCommandInOriginalDir('git branch --show-current 2>/dev/null || echo "unknown"');
+      const lastCommit = runCommandInOriginalDir('git log -1 --pretty=format:"%h - %s (%cr)" 2>/dev/null || echo "No commits"');
       
       repoInfo = `
 # Code Summary
