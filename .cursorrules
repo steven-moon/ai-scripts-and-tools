@@ -1,0 +1,58 @@
+Cursor Rules For AI
+
+# Project Overview Rules
+- This project is a TypeScript-based collection of AI scripts and tools for generating git commit messages, code summaries, and interacting with various LLM providers.
+- The core scripts include `generate-git-commit.ts` for creating AI-assisted commit messages and `generate-code-summary.ts` for generating codebase summaries.
+- The project supports multiple LLM providers including Local LLMs, OpenAI, Anthropic, Google Gemini, and custom providers.
+
+# Code Organization Rules
+- The project follows a modular structure with clear separation of concerns.
+- Source code is in `src/` directory with the main functionality in `src/scripts/`.
+- Utilities and shared code are in `src/utils/` directory.
+- LLM provider implementations are in `src/utils/llm/` directory.
+- Templates and prompt files are in `templates/` directory.
+- Documentation is in `documents/` directory.
+
+# LLM Architecture Rules
+- The `BaseLLMClient` class in `src/utils/llm/base-llm-client.ts` defines the interface for all LLM providers.
+- Each provider is implemented as a separate class that extends `BaseLLMClient`.
+- The `LLMClientFactory` in `src/utils/llm/llm-client-factory.ts` provides a factory pattern for creating LLM clients.
+- Configuration is loaded from environment variables in `.env` file.
+- When suggesting changes to LLM integration, maintain consistent error handling and logging patterns.
+
+# Code Style Rules
+- Follow TypeScript best practices with proper typing.
+- Maintain consistent error handling throughout the codebase.
+- Include JSDoc comments for public APIs and complex functions.
+- Use async/await for asynchronous operations rather than Promises.
+- Follow existing patterns for logging and error reporting.
+
+# Feature Enhancement Rules
+- When adding new features, follow the existing architecture patterns.
+- New LLM providers should implement the `BaseLLMClient` interface.
+- Update documentation in the `documents/` directory when adding new features.
+- Update the `.env.example` file when adding new configuration options.
+- Add tests for new features in the `tests/` directory.
+
+# Testing Rules
+- The project has testing utilities in the `tests/` directory.
+- Use `tests/scripts/test-llm-providers.ts` for testing LLM provider integration.
+- Follow existing patterns for writing new tests.
+- Ensure tests are comprehensive and cover error cases.
+
+# Command Line Interface Rules
+- CLI tools should provide clear usage instructions and error messages.
+- Follow existing patterns for handling command line arguments.
+- Maintain backward compatibility for existing command line interfaces.
+
+# Environment Configuration Rules
+- The project uses `.env` file for configuration.
+- Reference `.env.example` for available configuration options.
+- Required environment variables should be well-documented.
+- Provide sensible defaults where possible.
+
+# Documentation Rules
+- Keep documentation in the `documents/` directory up-to-date.
+- Follow Markdown formatting for documentation files.
+- Include usage examples in documentation.
+- Document configuration options and environment variables. 
