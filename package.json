@@ -15,7 +15,12 @@
     "type": "git",
     "url": "git+https://github.com/steven-moon/ai-scripts-and-tools.git"
   },
-  "keywords": ["ai", "tools", "scripts", "typescript"],
+  "keywords": [
+    "ai",
+    "tools",
+    "scripts",
+    "typescript"
+  ],
   "author": "Steven Moon",
   "license": "MIT",
   "bugs": {
@@ -26,5 +31,8 @@
     "@types/node": "^20.x.x",
     "ts-node": "^10.x.x",
     "typescript": "^5.x.x"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7"
   }
 }

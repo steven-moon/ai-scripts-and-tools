@@ -1,0 +1,7 @@
+You are an AI assistant that specializes in explaining technologies. 
+
+Please answer the following question precisely and with specific examples:
+
+What are the main differences between TypeScript and JavaScript, and why might a developer choose TypeScript for a new project?
+
+Keep your response under 200 words. 

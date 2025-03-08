@@ -1,6 +1,7 @@
 import fs from 'fs';
 import { runCommand, askQuestion } from '../utils/shell';
-import { queryLocalLLM } from '../utils/llm';
+import { queryLLM } from '../utils/llm';
+import { LLMClientFactory, LLMConfig, LLMProviderType } from '../utils/llm/llm-client-factory';
 import path from 'path';
 import os from 'os';
 
@@ -151,14 +152,88 @@ async function editInEditor(text: string): Promise<string> {
 }
 
 /**
- * Generate commit messages based on staged changes using a local LLM
+ * Display provider and model information
+ * @param factory - The LLM client factory instance
+ * @param provider - The provider type (or undefined to use default)
+ * @param model - The model name (or undefined to use default)
+ */
+function displayProviderInfo(factory: LLMClientFactory, provider?: LLMProviderType, model?: string): void {
+  const config = factory.getConfig();
+  const effectiveProvider = provider || config.provider;
+  
+  // Display the provider being used
+  console.log(`Using provider: ${effectiveProvider}`);
+  
+  // Get the effective model that will be used based on defaults and overrides
+  let effectiveModel = model;
+  
+  if (!effectiveModel) {
+    // If no explicit model is provided, determine what model would be used
+    if (config.model) {
+      // Global model setting
+      effectiveModel = config.model;
+      console.log(`Using global model: ${effectiveModel}`);
+    } else {
+      // Provider-specific default model
+      switch (effectiveProvider) {
+        case 'openai':
+          effectiveModel = config.openaiDefaultModel;
+          if (effectiveModel) console.log(`Using OpenAI default model: ${effectiveModel}`);
+          break;
+        case 'anthropic':
+          effectiveModel = config.anthropicDefaultModel;
+          if (effectiveModel) console.log(`Using Anthropic default model: ${effectiveModel}`);
+          break;
+        case 'gemini':
+          effectiveModel = config.geminiDefaultModel;
+          if (effectiveModel) console.log(`Using Gemini default model: ${effectiveModel}`);
+          break;
+        case 'custom':
+          effectiveModel = config.customDefaultModel;
+          if (effectiveModel) console.log(`Using custom provider default model: ${effectiveModel}`);
+          break;
+        case 'local':
+          effectiveModel = config.localModel;
+          if (effectiveModel) console.log(`Using local default model: ${effectiveModel}`);
+          break;
+      }
+    }
+  } else {
+    console.log(`Using specified model: ${effectiveModel}`);
+  }
+  
+  if (!effectiveModel) {
+    console.log('No model specified. Using provider default.');
+  }
+}
+
+/**
+ * Generate commit messages based on staged changes using a configured LLM
  */
 async function main() {
   const args = process.argv.slice(2);
-  const templateFile = args[0];
+  let templateFile = '';
+  let provider: LLMProviderType | undefined;
+  let model: string | undefined;
+  let shouldCopy = false;
+  
+  // Parse command line arguments
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--provider' || args[i] === '-p') {
+      provider = args[i + 1] as LLMProviderType;
+      i++;
+    } else if (args[i] === '--model' || args[i] === '-m') {
+      model = args[i + 1];
+      i++;
+    } else if (args[i] === '--copy' || args[i] === '-c') {
+      shouldCopy = true;
+    } else if (!templateFile) {
+      templateFile = args[i];
+    }
+  }
 
   if (!templateFile) {
-    console.error("Usage: ts-node generate-git-commit.ts <template-file>");
+    console.error("Usage: ts-node generate-git-commit.ts <template-file> [--provider local|openai|anthropic|gemini|custom] [--model MODEL_NAME] [--copy]");
     process.exit(1);
   }
 
@@ -200,12 +275,19 @@ async function main() {
 
   console.log("Generating commit message...");
   
-  // Query the LLM
   try {
+    // Get the LLM client factory and display current config
+    const factory = LLMClientFactory.getInstance();
+    
+    // Display provider and model info
+    displayProviderInfo(factory, provider, model);
+    
     // Get the raw response from the LLM
-    let rawCommitMessage = await queryLocalLLM(template, {
+    let rawCommitMessage = await queryLLM(template, {
       maxTokens: 2000,
-      temperature: 0.5
+      temperature: 0.5,
+      provider: provider,
+      model: model
     });
 
     // Process the message to fix formatting issues
@@ -216,7 +298,7 @@ async function main() {
     console.log('\n');
 
     // Copy to clipboard if requested
-    if (args.includes('--copy') || args.includes('-c')) {
+    if (shouldCopy) {
       copyToClipboard(generatedCommitMessage);
     }
     

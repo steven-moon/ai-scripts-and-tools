@@ -14,7 +14,9 @@ export function runCommand(command: string): string {
   try {
     return execSync(command, { encoding: 'utf8' }).trim();
   } catch (error) {
-    return '';
+    const errorMessage = `Error executing command: ${error instanceof Error ? error.message : String(error)}`;
+    console.error(errorMessage);
+    throw new Error(errorMessage);
   }
 }
 
