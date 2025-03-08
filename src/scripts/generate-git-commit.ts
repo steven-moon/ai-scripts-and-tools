@@ -4,6 +4,8 @@ import { queryLLM } from '../utils/llm';
 import { LLMClientFactory, LLMConfig, LLMProviderType } from '../utils/llm/llm-client-factory';
 import path from 'path';
 import os from 'os';
+import { spawn } from 'child_process';
+import { copyToClipboard } from '../utils/clipboard';
 
 /**
  * Truncate text to a maximum length, preserving the beginning and end
@@ -73,65 +75,6 @@ function processCommitMessage(message: string): string {
   
   console.log("Processed commit message:", processed);
   return processed;
-}
-
-/**
- * Copy text to clipboard
- * @param text - Text to copy to clipboard
- */
-function copyToClipboard(text: string): void {
-  const platform = process.platform;
-  try {
-    if (platform === 'darwin') {
-      // macOS
-      const proc = require('child_process').spawnSync('pbcopy', {
-        input: text,
-        encoding: 'utf-8'
-      });
-      if (proc.error) {
-        throw new Error(`Failed to copy to clipboard: ${proc.error.message}`);
-      }
-      console.log('✓ Commit message copied to clipboard');
-    } else if (platform === 'win32') {
-      // Windows
-      const proc = require('child_process').spawnSync('clip', {
-        input: text,
-        encoding: 'utf-8'
-      });
-      if (proc.error) {
-        throw new Error(`Failed to copy to clipboard: ${proc.error.message}`);
-      }
-      console.log('✓ Commit message copied to clipboard');
-    } else {
-      // Linux/Unix
-      try {
-        const proc = require('child_process').spawnSync('xclip', ['-selection', 'clipboard'], {
-          input: text,
-          encoding: 'utf-8'
-        });
-        if (!proc.error) {
-          console.log('✓ Commit message copied to clipboard');
-          return;
-        }
-      } catch (e) {
-        // xclip not available, try xsel
-        try {
-          const proc = require('child_process').spawnSync('xsel', ['-ib'], {
-            input: text,
-            encoding: 'utf-8'
-          });
-          if (!proc.error) {
-            console.log('✓ Commit message copied to clipboard');
-            return;
-          }
-        } catch (e) {
-          console.error('Could not copy to clipboard: xclip or xsel not available');
-        }
-      }
-    }
-  } catch (error) {
-    console.error('Failed to copy to clipboard:', error);
-  }
 }
 
 /**
@@ -367,6 +310,8 @@ async function main() {
     // Copy to clipboard if requested
     if (shouldCopy) {
       copyToClipboard(processedCommitMessage);
+      console.log('✓ Commit message copied to clipboard');
+      return;
     }
     
     const action = await askQuestion('What would you like to do? (u)se as is, (e)dit, (c)opy to clipboard, or (a)bort: ');
@@ -393,7 +338,7 @@ async function main() {
       }
     } else if (action.toLowerCase() === 'c') {
       copyToClipboard(processedCommitMessage);
-      console.log('Commit message copied to clipboard. No commit was made.');
+      console.log('✓ Commit message copied to clipboard. No commit was made.');
       return;
     } else if (action.toLowerCase() !== 'u') {
       console.log('Commit aborted.');

@@ -33,6 +33,7 @@
     "typescript": "^5.x.x"
   },
   "dependencies": {
+    "axios": "^1.6.7",
     "dotenv": "^16.4.7",
     "ignore": "^7.0.3"
   }

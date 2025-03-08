@@ -4,10 +4,8 @@
  */
 
 import { BaseLLMClient, LLMClientOptions, LLMCompletionResult } from './base-llm-client';
-import { runCommand } from '../shell';
-import fs from 'fs';
-import path from 'path';
-import os from 'os';
+import { HttpClient } from '../httpClient';
+import { TempFileManager } from '../tempFile';
 
 export interface AnthropicClientOptions extends LLMClientOptions {
   // API key for Anthropic
@@ -44,10 +42,6 @@ export class AnthropicLLMClient extends BaseLLMClient {
     
     const { model, maxTokens, temperature, apiKey, endpoint } = options;
     
-    // Create a temporary file to store the request body
-    const tempDir = os.tmpdir();
-    const tempFile = path.join(tempDir, `anthropic-request-${Date.now()}.json`);
-    
     // Create the request body (Anthropic format)
     const requestBody = {
       model: model,
@@ -58,33 +52,39 @@ export class AnthropicLLMClient extends BaseLLMClient {
       temperature: temperature
     };
     
-    // Write the request body to the temporary file
-    fs.writeFileSync(tempFile, JSON.stringify(requestBody, null, 2), 'utf8');
-    
     try {
-      // Use the temp file in the curl command with Anthropic auth header
-      const response = runCommand(
-        `curl -X POST ${endpoint} -H "Content-Type: application/json" -H "x-api-key: ${apiKey}" -H "anthropic-version: 2023-06-01" -d @${tempFile}`
+      // Make the HTTP request using our HttpClient
+      const response = await HttpClient.post(
+        endpoint as string,
+        requestBody,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': apiKey as string,
+            'anthropic-version': '2023-06-01'
+          }
+        }
       );
-      
-      // Clean up the temporary file
-      fs.unlinkSync(tempFile);
       
       try {
         // Parse the response
-        const parsedResponse = JSON.parse(response);
+        const parsedResponse = JSON.parse(response.data);
         
         if (parsedResponse.error) {
           throw new Error(`Anthropic API error: ${parsedResponse.error.message}`);
         }
         
         if (parsedResponse && parsedResponse.content && parsedResponse.content.length > 0) {
-          // Extract the text from the content array
-          const text = parsedResponse.content
-            .filter((item: any) => item.type === 'text')
-            .map((item: any) => item.text)
-            .join('\n');
-            
+          // Extract text from response
+          let text = '';
+          
+          // Anthropic returns an array of content blocks
+          for (const block of parsedResponse.content) {
+            if (block.type === 'text') {
+              text += block.text;
+            }
+          }
+          
           return {
             text: text.trim(),
             usage: parsedResponse.usage || {}
@@ -93,7 +93,7 @@ export class AnthropicLLMClient extends BaseLLMClient {
           throw new Error("Invalid response format from Anthropic API");
         }
       } catch (error) {
-        console.error("Raw API response:", response);
+        console.error("Raw API response:", response.data);
         throw new Error(`Error parsing Anthropic response: ${error}`);
       }
     } catch (error) {
@@ -102,7 +102,7 @@ export class AnthropicLLMClient extends BaseLLMClient {
   }
   
   public getName(): string {
-    return 'Anthropic Claude';
+    return 'Anthropic';
   }
   
   public isConfigured(): boolean {

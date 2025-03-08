@@ -1,7 +1,7 @@
 #!/usr/bin/env ts-node
 
 /**
- * generate-code-summary-file.ts
+ * generate-code-summary.ts
  * 
  * This script generates a text summary of all files in the current directory and subdirectories.
  * It respects .gitignore patterns and can be configured with additional ignore patterns.
@@ -11,6 +11,8 @@
  * 
  * Options:
  *   -d, --details    Include full text of each file in the output
+ *   -c, --clipboard  Copy the output to clipboard instead of saving to a file
+ *   -i, --interactive  Run in interactive mode with prompts
  * 
  * If no output file is specified, it will create a summary.md file in the current directory.
  */
@@ -19,7 +21,9 @@ import fs from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
 import ignore from 'ignore';
-import { runCommand } from '../utils/shell';
+import { execSync } from 'child_process';
+import { runCommand, askQuestion } from '../utils/shell';
+import { copyToClipboard } from '../utils/clipboard';
 
 // Load environment variables
 dotenv.config();
@@ -43,26 +47,49 @@ const DEFAULT_IGNORE_PATTERNS = [
 interface CommandOptions {
   detailedOutput: boolean;
   outputFile: string;
+  copyToClipboard: boolean;
+  interactive: boolean;
 }
 
 const parseArgs = (): CommandOptions => {
   const args = process.argv.slice(2);
   let detailedOutput = false;
   let outputFilePath = '';
+  let copyToClipboard = false;
+  // Make interactive mode true by default
+  let interactive = true;
+  
+  // Flag to track if any mode-specific flags were provided
+  let modeSpecificFlagsProvided = false;
   
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     
     if (arg === '-d' || arg === '--details') {
       detailedOutput = true;
+      modeSpecificFlagsProvided = true;
+    } else if (arg === '-c' || arg === '--clipboard') {
+      copyToClipboard = true;
+      modeSpecificFlagsProvided = true;
+    } else if (arg === '-i' || arg === '--interactive') {
+      interactive = true;
     } else if (!arg.startsWith('-') && !outputFilePath) {
       outputFilePath = arg;
+      modeSpecificFlagsProvided = true;
     }
+  }
+  
+  // Only disable interactive mode if specific flags were provided
+  // and the interactive flag was not explicitly set
+  if (modeSpecificFlagsProvided && !args.includes('-i') && !args.includes('--interactive')) {
+    interactive = false;
   }
   
   return {
     detailedOutput,
-    outputFile: outputFilePath
+    outputFile: outputFilePath,
+    copyToClipboard,
+    interactive
   };
 };
 
@@ -242,15 +269,69 @@ const processDirectory = (
   return { summaries, details };
 };
 
+/**
+ * Get user's output preference through interactive prompts
+ */
+const getOutputPreference = async (defaultFile: string): Promise<{ toFile: boolean; toClipboard: boolean; outputFile: string; includeDetails: boolean }> => {
+  console.log('\n--- Output Options ---');
+  
+  // Ask about output destination
+  const outputChoice = await askQuestion('Where do you want to send the output?\n1. Save to a file\n2. Copy to clipboard\n3. Both\nChoice (1-3): ');
+  
+  const toFile = outputChoice === '1' || outputChoice === '3';
+  const toClipboard = outputChoice === '2' || outputChoice === '3';
+  
+  // Ask about output filename if saving to file
+  let outputFile = defaultFile;
+  if (toFile) {
+    const customFilename = await askQuestion(`Enter output filename (default: ${path.basename(defaultFile)}): `);
+    if (customFilename.trim()) {
+      outputFile = path.resolve(path.dirname(defaultFile), customFilename);
+    }
+  }
+  
+  // Ask about including details
+  console.log('\n--- Content Options ---');
+  const detailsChoice = await askQuestion('Would you like to include file contents in the summary?\n1. Basic summary only\n2. Include file contents (details mode)\nChoice (1-2): ');
+  const includeDetails = detailsChoice === '2';
+  
+  if (includeDetails) {
+    console.log('Details mode enabled - file contents will be included in the output');
+  } else {
+    console.log('Basic mode selected - only file summaries will be included');
+  }
+  
+  return { toFile, toClipboard, outputFile, includeDetails };
+};
+
 // Main function to generate code summary
 const generateCodeSummary = async (): Promise<void> => {
   const options = parseArgs();
   const currentDir = process.cwd();
-  const outputFile = options.outputFile || path.join(currentDir, 'summary.md');
+  const defaultOutputFile = path.join(currentDir, 'summary.md');
   
-  console.log(`Generating code summary for: ${currentDir}`);
-  console.log(`Output will be saved to: ${outputFile}`);
-  if (options.detailedOutput) {
+  let outputToFile = !options.copyToClipboard;
+  let outputToClipboard = options.copyToClipboard;
+  let outputFile = options.outputFile || defaultOutputFile;
+  let includeDetails = options.detailedOutput;
+  
+  // Handle interactive mode
+  if (options.interactive) {
+    const preference = await getOutputPreference(outputFile);
+    outputToFile = preference.toFile;
+    outputToClipboard = preference.toClipboard;
+    outputFile = preference.outputFile;
+    includeDetails = preference.includeDetails;
+  }
+  
+  console.log(`\nGenerating code summary for: ${currentDir}`);
+  if (outputToFile) {
+    console.log(`Output will be saved to: ${outputFile}`);
+  }
+  if (outputToClipboard) {
+    console.log('Output will be copied to clipboard');
+  }
+  if (includeDetails) {
     console.log('Including detailed file contents in the output');
   }
   
@@ -284,7 +365,7 @@ const generateCodeSummary = async (): Promise<void> => {
 - **Branch**: ${branch}
 - **Last Commit**: ${lastCommit}
 - **Generated**: ${new Date().toLocaleString()}
-- **Details Mode**: ${options.detailedOutput ? 'Enabled' : 'Disabled'}
+- **Details Mode**: ${includeDetails ? 'Enabled' : 'Disabled'}
 
 `;
     }
@@ -296,28 +377,44 @@ const generateCodeSummary = async (): Promise<void> => {
 ## General Information
 - **Directory**: ${path.basename(currentDir)}
 - **Generated**: ${new Date().toLocaleString()}
-- **Details Mode**: ${options.detailedOutput ? 'Enabled' : 'Disabled'}
+- **Details Mode**: ${includeDetails ? 'Enabled' : 'Disabled'}
 
 `;
   }
   
   // Generate the summary
-  const { summaries, details } = processDirectory(currentDir, currentDir, ignoreRules, options.detailedOutput);
+  const { summaries, details } = processDirectory(currentDir, currentDir, ignoreRules, includeDetails);
   
   // Write the summary to a file
   let content = repoInfo + summaries.join('\n');
   
   // Add detailed content if requested
-  if (options.detailedOutput && details.length > 0) {
+  if (includeDetails && details.length > 0) {
     content += '\n\n## File Contents\n\n';
     content += details.join('\n');
   }
   
+  // Handle output based on user preferences
   try {
-    fs.writeFileSync(outputFile, content, 'utf8');
-    console.log(`Code summary generated successfully at ${outputFile}`);
+    if (outputToFile) {
+      fs.writeFileSync(outputFile, content, 'utf8');
+      console.log(`Code summary generated successfully at ${outputFile}`);
+    }
+    
+    if (outputToClipboard) {
+      const copied = copyToClipboard(content);
+      if (copied) {
+        console.log('Code summary copied to clipboard successfully');
+      } else {
+        console.warn('Failed to copy to clipboard. Please install clipboard utilities for your platform.');
+      }
+    }
+    
+    if (!outputToFile && !outputToClipboard) {
+      console.log('No output method selected. Summary was generated but not saved.');
+    }
   } catch (error) {
-    console.error('Error writing summary file:', error);
+    console.error('Error handling output:', error);
     process.exit(1);
   }
 };

@@ -4,10 +4,8 @@
  */
 
 import { BaseLLMClient, LLMClientOptions, LLMCompletionResult } from './base-llm-client';
-import { runCommand } from '../shell';
-import fs from 'fs';
-import path from 'path';
-import os from 'os';
+import { HttpClient } from '../httpClient';
+import { TempFileManager } from '../tempFile';
 
 export interface OpenAIClientOptions extends LLMClientOptions {
   // API key for OpenAI
@@ -67,10 +65,6 @@ export class OpenAILLMClient extends BaseLLMClient {
     
     console.log(`Using OpenAI ${usesChatAPI ? 'chat' : 'completions'} API for model: ${model}`);
     
-    // Create a temporary file to store the request body
-    const tempDir = os.tmpdir();
-    const tempFile = path.join(tempDir, `openai-request-${Date.now()}.json`);
-    
     // Create the request body based on the API type
     let requestBody;
     
@@ -97,28 +91,29 @@ export class OpenAILLMClient extends BaseLLMClient {
       };
     }
     
-    // Write the request body to the temporary file
-    fs.writeFileSync(tempFile, JSON.stringify(requestBody, null, 2), 'utf8');
-    
     try {
-      // Use the temp file in the curl command with OpenAI auth header
-      const response = runCommand(
-        `curl -X POST ${endpoint} -H "Content-Type: application/json" -H "Authorization: Bearer ${apiKey}" -d @${tempFile}`
+      // Make HTTP request using the HttpClient utility
+      const response = await HttpClient.post(
+        endpoint as string,
+        requestBody,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          }
+        }
       );
       
-      // Clean up the temporary file
-      fs.unlinkSync(tempFile);
-      
       // Debug the raw response to see what we're getting
-      if (response.length < 1000) {
-        console.log("Raw API response:", response);
+      if (response.data.length < 1000) {
+        console.log("Raw API response:", response.data);
       } else {
-        console.log(`Raw API response length: ${response.length} characters`);
+        console.log(`Raw API response length: ${response.data.length} characters`);
       }
       
       try {
         // Parse the response
-        const parsedResponse = JSON.parse(response);
+        const parsedResponse = JSON.parse(response.data);
         
         if (parsedResponse.error) {
           throw new Error(`OpenAI API error: ${parsedResponse.error.message}`);
@@ -157,7 +152,7 @@ export class OpenAILLMClient extends BaseLLMClient {
           throw new Error("Invalid response format from OpenAI API");
         }
       } catch (error) {
-        console.error("Raw API response:", response);
+        console.error("Raw API response:", response.data);
         throw new Error(`Error parsing OpenAI response: ${error}`);
       }
     } catch (error) {
