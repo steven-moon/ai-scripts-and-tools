@@ -3,11 +3,8 @@
  * Implementation for custom providers using OpenAI API format
  */
 
-import { BaseLLMClient, LLMClientOptions, LLMCompletionResult } from './base-llm-client';
-import { runCommand } from '../shell';
-import fs from 'fs';
-import path from 'path';
-import os from 'os';
+import { BaseLLMClient, LLMClientOptions, LLMCompletionResult, LLMLogger } from './base-llm-client';
+import { HttpResponse } from '../httpClient';
 
 export interface CustomClientOptions extends LLMClientOptions {
   // API key for custom provider
@@ -48,56 +45,77 @@ export class CustomLLMClient extends BaseLLMClient {
       ...overrideOptions
     };
     
-    const { model, maxTokens, temperature, apiKey, endpoint } = options;
+    LLMLogger.info(`Using ${this.providerName} with model: ${options.model || 'default'}`);
     
-    // Create a temporary file to store the request body
-    const tempDir = os.tmpdir();
-    const tempFile = path.join(tempDir, `custom-request-${Date.now()}.json`);
+    // Send the request using the common implementation
+    return this.sendLLMRequest(prompt, options, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${options.apiKey}`
+      }
+    });
+  }
+  
+  /**
+   * Format the request body (using OpenAI-like format)
+   */
+  protected formatRequestBody(prompt: string, options: LLMClientOptions): any {
+    const { model, maxTokens, temperature } = options;
     
-    // Create the request body (OpenAI format)
-    const requestBody = {
+    // Use OpenAI-compatible format
+    return {
       model: model,
       prompt: prompt,
       max_tokens: maxTokens,
       temperature: temperature
     };
-    
-    // Write the request body to the temporary file
-    fs.writeFileSync(tempFile, JSON.stringify(requestBody, null, 2), 'utf8');
-    
+  }
+  
+  /**
+   * Parse the response (assuming OpenAI-like format)
+   */
+  protected parseResponse(response: HttpResponse): LLMCompletionResult {
     try {
-      // Use the temp file in the curl command with auth header
-      const response = runCommand(
-        `curl -X POST ${endpoint} -H "Content-Type: application/json" -H "Authorization: Bearer ${apiKey}" -d @${tempFile}`
-      );
+      const parsedResponse = JSON.parse(response.data);
       
-      // Clean up the temporary file
-      fs.unlinkSync(tempFile);
-      
-      try {
-        // Parse the response (assuming OpenAI format)
-        const parsedResponse = JSON.parse(response);
-        
-        if (parsedResponse.error) {
-          throw new Error(`${this.providerName} API error: ${parsedResponse.error.message || JSON.stringify(parsedResponse.error)}`);
-        }
-        
-        if (parsedResponse && parsedResponse.choices && parsedResponse.choices.length > 0) {
-          return {
-            text: parsedResponse.choices[0].text?.trim() || 
-                  parsedResponse.choices[0].message?.content?.trim() ||
-                  '',
-            usage: parsedResponse.usage || {}
-          };
-        } else {
-          throw new Error(`Invalid response format from ${this.providerName} API`);
-        }
-      } catch (error) {
-        console.error("Raw API response:", response);
-        throw new Error(`Error parsing ${this.providerName} response: ${error}`);
+      if (parsedResponse.error) {
+        throw this.createError(
+          `${this.providerName} API error: ${parsedResponse.error.message || JSON.stringify(parsedResponse.error)}`,
+          parsedResponse.error.status || 400,
+          parsedResponse.error
+        );
       }
-    } catch (error) {
-      throw new Error(`Error calling ${this.providerName} API: ${error}`);
+      
+      if (!parsedResponse.choices || parsedResponse.choices.length === 0) {
+        throw this.createError(
+          `Invalid response format from ${this.providerName} API: no choices returned`,
+          400,
+          parsedResponse
+        );
+      }
+      
+      // Extract text (handle both regular and chat API formats)
+      const text = parsedResponse.choices[0].text?.trim() || 
+                   parsedResponse.choices[0].message?.content?.trim();
+                  
+      if (!text) {
+        throw this.createError(
+          `No text content found in ${this.providerName} response`,
+          400,
+          parsedResponse.choices[0]
+        );
+      }
+      
+      return {
+        text: text,
+        usage: parsedResponse.usage || {}
+      };
+    } catch (error: any) {
+      if (error.message && error.message.includes(`${this.providerName} API`)) {
+        throw error; // Re-throw our own formatted errors
+      }
+      LLMLogger.error("Raw API response:", response.data);
+      throw this.createError(`Error parsing ${this.providerName} response: ${error.message}`, 500);
     }
   }
   

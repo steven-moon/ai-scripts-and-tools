@@ -219,8 +219,14 @@ git-commit-ai() {
   fi
   
   echo "Generating commit message using LLM..."
-  # Run the script directly with ts-node
-  (cd "$AI_SCRIPTS_PATH" && npx ts-node "$AI_SCRIPTS_PATH/src/scripts/generate-git-commit.ts" "$template_path" $provider_flag $model_flag $copy_flag)
+  # Run the script directly with ts-node instead of using npm script
+  # Use full paths and proper quotes to avoid command not found errors
+  export CURRENT_DIR="$(pwd)"
+  export ORIGINAL_CWD="$(pwd)"
+
+  # Debug the current working directory
+  echo "Current working directory before running script: $CURRENT_DIR"
+  (cd "$AI_SCRIPTS_PATH" &&  ts-node "$AI_SCRIPTS_PATH/src/scripts/generate-git-commit.ts" "$template_path" $provider_flag $model_flag $copy_flag)
 }
 
 # Alias for shorter command (optional)

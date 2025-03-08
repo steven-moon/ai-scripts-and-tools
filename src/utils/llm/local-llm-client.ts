@@ -3,11 +3,8 @@
  * Implementation for local LLM servers like Ollama or LM Studio
  */
 
-import { BaseLLMClient, LLMClientOptions, LLMCompletionResult } from './base-llm-client';
-import { runCommand } from '../shell';
-import fs from 'fs';
-import path from 'path';
-import os from 'os';
+import { BaseLLMClient, LLMClientOptions, LLMCompletionResult, LLMLogger } from './base-llm-client';
+import { HttpResponse } from '../httpClient';
 
 export interface LocalLLMClientOptions extends LLMClientOptions {
   // Default model for local LLMs
@@ -35,49 +32,62 @@ export class LocalLLMClient extends BaseLLMClient {
       ...overrideOptions
     };
     
-    const { model, maxTokens, temperature, endpoint } = options;
+    LLMLogger.info(`Using Local LLM with model: ${options.model || 'default'}`);
     
-    // Create a temporary file to store the request body
-    const tempDir = os.tmpdir();
-    const tempFile = path.join(tempDir, `llm-request-${Date.now()}.json`);
+    // Send the request using the common implementation
+    return this.sendLLMRequest(prompt, options, {
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+  }
+  
+  /**
+   * Format the request body for local LLM servers
+   */
+  protected formatRequestBody(prompt: string, options: LLMClientOptions): any {
+    const { model, maxTokens, temperature } = options;
     
-    // Create the request body
-    const requestBody = {
+    // OpenAI-compatible format used by most local LLM servers
+    return {
       model: model,
       prompt: prompt,
       max_tokens: maxTokens,
       temperature: temperature
     };
-    
-    // Write the request body to the temporary file
-    fs.writeFileSync(tempFile, JSON.stringify(requestBody, null, 2), 'utf8');
-    
+  }
+  
+  /**
+   * Parse the response from local LLM servers
+   */
+  protected parseResponse(response: HttpResponse): LLMCompletionResult {
     try {
-      // Use the temp file in the curl command
-      const response = runCommand(
-        `curl -X POST ${endpoint} -H "Content-Type: application/json" -d @${tempFile}`
-      );
+      const parsedResponse = JSON.parse(response.data);
       
-      // Clean up the temporary file
-      fs.unlinkSync(tempFile);
-      
-      try {
-        // Parse the response
-        const parsedResponse = JSON.parse(response);
-        if (parsedResponse && parsedResponse.choices && parsedResponse.choices.length > 0) {
-          return {
-            text: parsedResponse.choices[0].text.trim(),
-            usage: parsedResponse.usage || {}
-          };
-        } else {
-          throw new Error("Invalid response format from LLM API");
-        }
-      } catch (error) {
-        console.error("Raw API response:", response);
-        throw new Error(`Error parsing LLM response: ${error}`);
+      if (parsedResponse.error) {
+        throw this.createError(`Local LLM API error: ${parsedResponse.error.message || JSON.stringify(parsedResponse.error)}`, 
+          parsedResponse.error.status || 400, 
+          parsedResponse.error);
       }
-    } catch (error) {
-      throw new Error(`Error calling LLM API: ${error}`);
+      
+      if (!parsedResponse.choices || parsedResponse.choices.length === 0) {
+        throw this.createError("Invalid response format from Local LLM API: no choices returned", 400, parsedResponse);
+      }
+      
+      if (!parsedResponse.choices[0].text) {
+        throw this.createError("No text content found in Local LLM response", 400, parsedResponse.choices[0]);
+      }
+      
+      return {
+        text: parsedResponse.choices[0].text.trim(),
+        usage: parsedResponse.usage || {}
+      };
+    } catch (error: any) {
+      if (error.message && error.message.includes('Local LLM API')) {
+        throw error; // Re-throw our own formatted errors
+      }
+      LLMLogger.error("Raw API response:", response.data);
+      throw this.createError(`Error parsing Local LLM response: ${error.message}`, 500);
     }
   }
   

@@ -179,6 +179,24 @@ async function main() {
   
   // Debug the received arguments
   console.log('DEBUG: Received arguments:', args);
+
+  // Store the original working directory where the script was called from
+  const originalCwd = process.env.ORIGINAL_CWD || process.cwd();
+  
+  // Critical fix: If we're not in a git repository in the current working directory,
+  // this might be because we're running from the AI scripts directory but want to 
+  // apply to the actual user's directory
+  try {
+    if (!runCommand(`cd "${originalCwd}" && git rev-parse --is-inside-work-tree`).trim()) {
+      console.error(`Not in a git repository: ${originalCwd}`);
+      process.exit(1);
+    }
+  } catch (error) {
+    console.error(`Error checking git repository: ${error}`);
+    process.exit(1);
+  }
+  
+  console.log(`Working directory for git operations: ${originalCwd}`);
   
   let templateFile = '';
   let provider: LLMProviderType | undefined;
@@ -239,25 +257,63 @@ async function main() {
   const initialConfig = LLMClientFactory.getInstance().getConfig();
   console.log(`DEBUG: Initial provider before override: "${initialConfig.provider}"`);
 
+  // Function to run git commands in the original directory
+  const runGitCommand = (command: string): string => {
+    try {
+      return runCommand(`cd "${originalCwd}" && ${command}`);
+    } catch (error) {
+      console.error(`Error running git command: ${error}`);
+      return '';
+    }
+  };
+
   // Get git diff (limit to a reasonable size)
-  const gitDiff = truncateText(runCommand('git diff --cached'), 8000);
-  if (!gitDiff) {
+  let gitDiff = '';
+  try {
+    gitDiff = truncateText(runGitCommand('git diff --cached'), 8000);
+  } catch (error) {
+    console.error('Error getting git diff:', error);
+    console.log('Trying alternative approach...');
+    
+    // Try a more lightweight way to check if there are staged changes
+    const stagedFiles = runGitCommand('git diff --cached --name-only');
+    if (!stagedFiles.trim()) {
+      console.error('No staged changes found. Please stage your changes first.');
+      process.exit(1);
+    }
+    
+    // If we can at least get the list of files, we'll proceed with a simpler context
+    gitDiff = `Changes in files: ${stagedFiles.split('\n').join(', ')}`;
+  }
+  
+  if (!gitDiff.trim()) {
     console.error('No staged changes found. Please stage your changes first.');
     process.exit(1);
   }
 
   // Get affected files and their code context
-  const changedFiles = runCommand('git diff --cached --name-only')
+  const changedFiles = runGitCommand('git diff --cached --name-only')
     .split('\n')
     .filter(Boolean);
 
   // Build a concise context of changed files
   let codeContext = '';
   for (const file of changedFiles) {
-    if (fs.existsSync(file)) {
-      // For each file, only include the first 200 characters
-      const fileContent = fs.readFileSync(file, 'utf8').substring(0, 200);
-      codeContext += `\nFile: ${file}\n${fileContent}\n${fileContent.length > 200 ? '...' : ''}\n`;
+    const fullFilePath = path.join(originalCwd, file);
+    // Check if the path exists and is a file (not a directory)
+    if (fs.existsSync(fullFilePath) && fs.statSync(fullFilePath).isFile()) {
+      try {
+        // For each file, only include the first 200 characters
+        const fileContent = fs.readFileSync(fullFilePath, 'utf8').substring(0, 200);
+        codeContext += `\nFile: ${file}\n${fileContent}\n${fileContent.length > 200 ? '...' : ''}\n`;
+      } catch (error) {
+        // If there's an error reading the file, just mention it without content
+        console.log(`Warning: Could not read content of file: ${file}`);
+        codeContext += `\nFile: ${file}\n[Content could not be read]\n`;
+      }
+    } else if (fs.existsSync(fullFilePath) && fs.statSync(fullFilePath).isDirectory()) {
+      // If it's a directory, just note that
+      codeContext += `\nDirectory: ${file}\n[Directory structure not shown]\n`;
     }
   }
   
@@ -349,7 +405,7 @@ async function main() {
     // Using a temporary file approach to avoid shell escaping issues
     const tempCommitFile = path.join(os.tmpdir(), `git-commit-msg-${Date.now()}.txt`);
     fs.writeFileSync(tempCommitFile, processedCommitMessage, 'utf8');
-    runCommand(`git commit -F "${tempCommitFile}"`);
+    runGitCommand(`git commit -F "${tempCommitFile}"`);
     fs.unlinkSync(tempCommitFile); // Clean up
     
     console.log('Commit successful.');

@@ -3,9 +3,8 @@
  * Implementation for Anthropic's API (Claude models)
  */
 
-import { BaseLLMClient, LLMClientOptions, LLMCompletionResult } from './base-llm-client';
-import { HttpClient } from '../httpClient';
-import { TempFileManager } from '../tempFile';
+import { BaseLLMClient, LLMClientOptions, LLMCompletionResult, LLMLogger } from './base-llm-client';
+import { HttpResponse } from '../httpClient';
 
 export interface AnthropicClientOptions extends LLMClientOptions {
   // API key for Anthropic
@@ -40,10 +39,26 @@ export class AnthropicLLMClient extends BaseLLMClient {
       ...overrideOptions
     };
     
-    const { model, maxTokens, temperature, apiKey, endpoint } = options;
+    LLMLogger.info(`Using Anthropic API with model: ${options.model}`);
     
-    // Create the request body (Anthropic format)
-    const requestBody = {
+    // Send the request using the common implementation
+    return this.sendLLMRequest(prompt, options, {
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': options.apiKey as string,
+        'anthropic-version': '2023-06-01'
+      }
+    });
+  }
+  
+  /**
+   * Format the request body according to Anthropic's requirements
+   */
+  protected formatRequestBody(prompt: string, options: LLMClientOptions): any {
+    const { model, maxTokens, temperature } = options;
+    
+    // Anthropic's message format
+    return {
       model: model,
       messages: [
         { role: "user", content: prompt }
@@ -51,53 +66,49 @@ export class AnthropicLLMClient extends BaseLLMClient {
       max_tokens: maxTokens,
       temperature: temperature
     };
-    
+  }
+  
+  /**
+   * Parse the response according to Anthropic's format
+   */
+  protected parseResponse(response: HttpResponse): LLMCompletionResult {
     try {
-      // Make the HTTP request using our HttpClient
-      const response = await HttpClient.post(
-        endpoint as string,
-        requestBody,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': apiKey as string,
-            'anthropic-version': '2023-06-01'
-          }
-        }
-      );
+      const parsedResponse = JSON.parse(response.data);
       
-      try {
-        // Parse the response
-        const parsedResponse = JSON.parse(response.data);
-        
-        if (parsedResponse.error) {
-          throw new Error(`Anthropic API error: ${parsedResponse.error.message}`);
-        }
-        
-        if (parsedResponse && parsedResponse.content && parsedResponse.content.length > 0) {
-          // Extract text from response
-          let text = '';
-          
-          // Anthropic returns an array of content blocks
-          for (const block of parsedResponse.content) {
-            if (block.type === 'text') {
-              text += block.text;
-            }
-          }
-          
-          return {
-            text: text.trim(),
-            usage: parsedResponse.usage || {}
-          };
-        } else {
-          throw new Error("Invalid response format from Anthropic API");
-        }
-      } catch (error) {
-        console.error("Raw API response:", response.data);
-        throw new Error(`Error parsing Anthropic response: ${error}`);
+      if (parsedResponse.error) {
+        throw this.createError(`Anthropic API error: ${parsedResponse.error.message}`, 
+          parsedResponse.error.status || 400, 
+          parsedResponse.error);
       }
-    } catch (error) {
-      throw new Error(`Error calling Anthropic API: ${error}`);
+      
+      if (!parsedResponse.content || parsedResponse.content.length === 0) {
+        throw this.createError("Invalid response format from Anthropic API: no content returned", 400);
+      }
+      
+      // Extract text from response
+      let text = '';
+      
+      // Anthropic returns an array of content blocks
+      for (const block of parsedResponse.content) {
+        if (block.type === 'text') {
+          text += block.text;
+        }
+      }
+      
+      if (!text) {
+        throw this.createError("No text content found in Anthropic response", 400, parsedResponse.content);
+      }
+      
+      return {
+        text: text.trim(),
+        usage: parsedResponse.usage || {}
+      };
+    } catch (error: any) {
+      if (error.message && error.message.includes('Anthropic API')) {
+        throw error; // Re-throw our own formatted errors
+      }
+      LLMLogger.error("Raw API response:", response.data);
+      throw this.createError(`Error parsing Anthropic response: ${error.message}`, 500);
     }
   }
   

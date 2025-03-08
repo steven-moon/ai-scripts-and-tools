@@ -3,11 +3,8 @@
  * Implementation for Google's Gemini API
  */
 
-import { BaseLLMClient, LLMClientOptions, LLMCompletionResult } from './base-llm-client';
-import { runCommand } from '../shell';
-import fs from 'fs';
-import path from 'path';
-import os from 'os';
+import { BaseLLMClient, LLMClientOptions, LLMCompletionResult, LLMLogger } from './base-llm-client';
+import { HttpResponse } from '../httpClient';
 
 export interface GeminiClientOptions extends LLMClientOptions {
   // API key for Google AI Studio
@@ -42,14 +39,34 @@ export class GeminiLLMClient extends BaseLLMClient {
       ...overrideOptions
     };
     
-    const { model, maxTokens, temperature, apiKey, endpoint } = options;
+    // Ensure the model name has the correct format
+    const formattedModel = this.formatModelName(options.model || '');
+    options.model = formattedModel;
     
-    // Create a temporary file to store the request body
-    const tempDir = os.tmpdir();
-    const tempFile = path.join(tempDir, `gemini-request-${Date.now()}.json`);
+    // Format the full URL with model and API key
+    const apiUrl = `${options.endpoint}/models/${formattedModel}:generateContent?key=${options.apiKey}`;
     
-    // Create the request body (Gemini format)
-    const requestBody = {
+    LLMLogger.info(`Using Gemini model: ${formattedModel}`);
+    
+    // Override the endpoint with the full URL
+    options.endpoint = apiUrl;
+    
+    // Send the request using the common implementation
+    return this.sendLLMRequest(prompt, options, {
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+  }
+  
+  /**
+   * Format the request body according to Gemini's requirements
+   */
+  protected formatRequestBody(prompt: string, options: LLMClientOptions): any {
+    const { maxTokens, temperature } = options;
+    
+    // Gemini message format
+    return {
       contents: [
         {
           parts: [
@@ -62,107 +79,59 @@ export class GeminiLLMClient extends BaseLLMClient {
         temperature: temperature
       }
     };
-    
-    console.log("Gemini request body:", JSON.stringify(requestBody, null, 2));
-    
-    // Write the request body to the temporary file
-    fs.writeFileSync(tempFile, JSON.stringify(requestBody, null, 2), 'utf8');
-    console.log(`Request written to temp file: ${tempFile}`);
-    
-    // Ensure the model name has the correct format
-    const formattedModel = this.formatModelName(model || '');
-    
-    // Construct the full URL with the API key
-    // Format: {endpoint}/models/{model}:generateContent?key={apiKey}
-    const fullUrl = `${endpoint}/models/${formattedModel}:generateContent?key=${apiKey}`;
-    console.log(`API URL: ${fullUrl}`);
-    
+  }
+  
+  /**
+   * Parse the response according to Gemini's format
+   */
+  protected parseResponse(response: HttpResponse): LLMCompletionResult {
     try {
-      // Create a more reliable curl command - write request to file and output to file
-      console.log(`Using Gemini model: ${formattedModel}`);
+      const parsedResponse = JSON.parse(response.data);
       
-      // Create a temporary output file
-      const outputFile = path.join(tempDir, `gemini-response-${Date.now()}.json`);
-      console.log(`Response will be written to: ${outputFile}`);
-      
-      // Run curl with both request and response as files
-      const curlCommand = `curl -s -X POST "${fullUrl}" -H "Content-Type: application/json" -d @${tempFile} -o ${outputFile}`;
-      console.log(`Executing: ${curlCommand}`);
-      const curlResult = runCommand(curlCommand);
-      console.log(`Curl command result: '${curlResult}'`);
-      
-      // Read the response from the output file
-      let response = '';
-      try {
-        console.log(`Reading response from: ${outputFile}`);
-        if (fs.existsSync(outputFile)) {
-          response = fs.readFileSync(outputFile, 'utf8');
-          console.log(`Response read successfully, length: ${response.length} bytes`);
-          // console.log(`Response content: ${response}`);
-          
-          // Clean up the temporary files
-          fs.unlinkSync(tempFile);
-          fs.unlinkSync(outputFile);
-        } else {
-          console.error(`Response file does not exist: ${outputFile}`);
-          throw new Error('Response file was not created');
-        }
-        
-        // Check if response is empty - this would indicate the curl command failed
-        if (!response || response.trim() === '') {
-          throw new Error('Empty response from Gemini API. Check your API key and network connection.');
-        }
-        
-        try {
-          // Parse the response
-          const parsedResponse = JSON.parse(response);
-          
-          if (parsedResponse.error) {
-            throw new Error(`Gemini API error: ${parsedResponse.error.message}`);
-          }
-          
-          if (parsedResponse && 
-              parsedResponse.candidates && 
-              parsedResponse.candidates.length > 0 && 
-              parsedResponse.candidates[0].content &&
-              parsedResponse.candidates[0].content.parts &&
-              parsedResponse.candidates[0].content.parts.length > 0) {
-            
-            // Extract text from the response
-            const text = parsedResponse.candidates[0].content.parts
-              .filter((part: any) => part.text)
-              .map((part: any) => part.text)
-              .join('\n');
-              
-            return {
-              text: text.trim(),
-              usage: {
-                promptTokens: parsedResponse.usageMetadata?.promptTokenCount || 0,
-                completionTokens: parsedResponse.usageMetadata?.candidatesTokenCount || 0,
-                totalTokens: (parsedResponse.usageMetadata?.promptTokenCount || 0) + 
-                            (parsedResponse.usageMetadata?.candidatesTokenCount || 0)
-              }
-            };
-          } else {
-            throw new Error("Invalid response format from Gemini API");
-          }
-        } catch (error) {
-          console.error("Raw API response:", response);
-          throw new Error(`Error parsing Gemini response: ${error}`);
-        }
-      } catch (readError) {
-        console.error(`Error reading response file: ${readError}`);
-        throw new Error('Failed to read API response');
+      if (parsedResponse.error) {
+        throw this.createError(`Gemini API error: ${parsedResponse.error.message}`, 
+          parsedResponse.error.code || 400, 
+          parsedResponse.error);
       }
-    } catch (error) {
-      throw new Error(`Error calling Gemini API: ${error}`);
+      
+      if (!parsedResponse.candidates || 
+          parsedResponse.candidates.length === 0 || 
+          !parsedResponse.candidates[0].content ||
+          !parsedResponse.candidates[0].content.parts ||
+          parsedResponse.candidates[0].content.parts.length === 0) {
+        throw this.createError("Invalid response format from Gemini API", 400, parsedResponse);
+      }
+      
+      // Extract text from the response
+      const text = parsedResponse.candidates[0].content.parts
+        .filter((part: any) => part.text)
+        .map((part: any) => part.text)
+        .join('\n');
+      
+      if (!text) {
+        throw this.createError("No text content found in Gemini response", 400, parsedResponse.candidates[0]);
+      }
+        
+      return {
+        text: text.trim(),
+        usage: {
+          promptTokens: parsedResponse.usageMetadata?.promptTokenCount || 0,
+          completionTokens: parsedResponse.usageMetadata?.candidatesTokenCount || 0,
+          totalTokens: (parsedResponse.usageMetadata?.promptTokenCount || 0) + 
+                      (parsedResponse.usageMetadata?.candidatesTokenCount || 0)
+        }
+      };
+    } catch (error: any) {
+      if (error.message && error.message.includes('Gemini API')) {
+        throw error; // Re-throw our own formatted errors
+      }
+      LLMLogger.error("Raw API response:", response.data);
+      throw this.createError(`Error parsing Gemini response: ${error.message}`, 500);
     }
   }
   
   /**
    * Format the model name to ensure it has the correct prefix
-   * @param modelName - The input model name
-   * @returns The properly formatted model name
    */
   private formatModelName(modelName: string): string {
     // If the model name already includes the "models/" prefix, return it as is

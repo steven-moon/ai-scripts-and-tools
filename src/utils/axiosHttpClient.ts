@@ -49,9 +49,21 @@ export class AxiosHttpClient {
       
       const response: AxiosResponse = await axios(config);
       
+      // Convert Axios headers to compatible format
+      const normalizedHeaders: Record<string, string | string[]> = {};
+      
+      // Handle the headers object from Axios
+      if (response.headers) {
+        Object.entries(response.headers).forEach(([key, value]) => {
+          if (value !== undefined) {
+            normalizedHeaders[key] = value;
+          }
+        });
+      }
+      
       return {
         status: response.status,
-        headers: response.headers,
+        headers: normalizedHeaders,
         data: typeof response.data === 'string' 
           ? response.data 
           : JSON.stringify(response.data)

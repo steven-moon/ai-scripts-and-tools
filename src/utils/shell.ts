@@ -12,7 +12,11 @@ import readline from 'readline';
  */
 export function runCommand(command: string): string {
   try {
-    return execSync(command, { encoding: 'utf8' }).trim();
+    // Increase maxBuffer to accommodate larger git diffs
+    return execSync(command, { 
+      encoding: 'utf8',
+      maxBuffer: 100 * 1024 * 1024 // 10MB buffer
+    }).trim();
   } catch (error) {
     const errorMessage = `Error executing command: ${error instanceof Error ? error.message : String(error)}`;
     console.error(errorMessage);

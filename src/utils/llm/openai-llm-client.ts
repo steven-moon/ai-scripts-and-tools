@@ -3,9 +3,8 @@
  * Implementation for OpenAI's API (GPT models)
  */
 
-import { BaseLLMClient, LLMClientOptions, LLMCompletionResult } from './base-llm-client';
-import { HttpClient } from '../httpClient';
-import { TempFileManager } from '../tempFile';
+import { BaseLLMClient, LLMClientOptions, LLMCompletionResult, LLMLogger } from './base-llm-client';
+import { HttpResponse } from '../httpClient';
 
 export interface OpenAIClientOptions extends LLMClientOptions {
   // API key for OpenAI
@@ -55,22 +54,37 @@ export class OpenAILLMClient extends BaseLLMClient {
       ...overrideOptions
     };
     
-    const { model, maxTokens, temperature, apiKey } = options;
+    const { model } = options;
     
     // Determine if we need to use the chat API based on the model name
     const usesChatAPI = this.isChatModel(model || '');
     
     // Set the correct endpoint based on the model type
-    const endpoint = usesChatAPI ? OpenAILLMClient.CHAT_ENDPOINT : options.endpoint;
+    if (usesChatAPI) {
+      options.endpoint = OpenAILLMClient.CHAT_ENDPOINT;
+    }
     
-    console.log(`Using OpenAI ${usesChatAPI ? 'chat' : 'completions'} API for model: ${model}`);
+    LLMLogger.info(`Using OpenAI ${usesChatAPI ? 'chat' : 'completions'} API for model: ${model}`);
     
-    // Create the request body based on the API type
-    let requestBody;
+    // Send the request using the common implementation
+    return this.sendLLMRequest(prompt, options, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${options.apiKey}`
+      }
+    });
+  }
+  
+  /**
+   * Format the request body according to OpenAI's requirements
+   */
+  protected formatRequestBody(prompt: string, options: LLMClientOptions): any {
+    const { model, maxTokens, temperature } = options;
+    const usesChatAPI = this.isChatModel(model || '');
     
     if (usesChatAPI) {
       // Chat completions format
-      requestBody = {
+      return {
         model: model,
         messages: [
           {
@@ -83,80 +97,63 @@ export class OpenAILLMClient extends BaseLLMClient {
       };
     } else {
       // Regular completions format
-      requestBody = {
+      return {
         model: model,
         prompt: prompt,
         max_tokens: maxTokens,
         temperature: temperature
       };
     }
-    
+  }
+  
+  /**
+   * Parse the response according to OpenAI's format
+   */
+  protected parseResponse(response: HttpResponse): LLMCompletionResult {
     try {
-      // Make HTTP request using the HttpClient utility
-      const response = await HttpClient.post(
-        endpoint as string,
-        requestBody,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-          }
-        }
-      );
+      const parsedResponse = JSON.parse(response.data);
       
-      // Debug the raw response to see what we're getting
-      if (response.data.length < 1000) {
-        console.log("Raw API response:", response.data);
-      } else {
-        console.log(`Raw API response length: ${response.data.length} characters`);
+      if (parsedResponse.error) {
+        throw this.createError(`OpenAI API error: ${parsedResponse.error.message}`, 
+          parsedResponse.error.status || 400, 
+          parsedResponse.error);
       }
       
-      try {
-        // Parse the response
-        const parsedResponse = JSON.parse(response.data);
-        
-        if (parsedResponse.error) {
-          throw new Error(`OpenAI API error: ${parsedResponse.error.message}`);
-        }
-        
-        if (parsedResponse && parsedResponse.choices && parsedResponse.choices.length > 0) {
-          // Debug the choices structure
-          console.log("API response structure:", JSON.stringify(parsedResponse.choices[0], null, 2));
-          
-          // Extract text based on API type
-          let text = '';
-          
-          if (usesChatAPI) {
-            if (parsedResponse.choices[0].message && parsedResponse.choices[0].message.content) {
-              text = parsedResponse.choices[0].message.content.trim();
-              console.log("Extracted text from chat response:", text);
-            } else {
-              console.error("Chat response format unexpected:", JSON.stringify(parsedResponse.choices[0]));
-              throw new Error("Invalid chat response format from OpenAI API");
-            }
-          } else {
-            if (parsedResponse.choices[0].text) {
-              text = parsedResponse.choices[0].text.trim();
-              console.log("Extracted text from completions response:", text);
-            } else {
-              console.error("Completions response format unexpected:", JSON.stringify(parsedResponse.choices[0]));
-              throw new Error("Invalid completions response format from OpenAI API");
-            }
-          }
-            
-          return {
-            text: text,
-            usage: parsedResponse.usage || {}
-          };
+      if (!parsedResponse.choices || parsedResponse.choices.length === 0) {
+        throw this.createError("Invalid response format from OpenAI API: no choices returned", 400);
+      }
+      
+      const usesChatAPI = parsedResponse.choices[0].message !== undefined;
+      
+      // Extract text based on API type
+      let text = '';
+      
+      if (usesChatAPI) {
+        if (parsedResponse.choices[0].message && parsedResponse.choices[0].message.content) {
+          text = parsedResponse.choices[0].message.content.trim();
+          LLMLogger.debug("Extracted text from chat response", { length: text.length });
         } else {
-          throw new Error("Invalid response format from OpenAI API");
+          throw this.createError("Invalid chat response format from OpenAI API", 400, parsedResponse.choices[0]);
         }
-      } catch (error) {
-        console.error("Raw API response:", response.data);
-        throw new Error(`Error parsing OpenAI response: ${error}`);
+      } else {
+        if (parsedResponse.choices[0].text) {
+          text = parsedResponse.choices[0].text.trim();
+          LLMLogger.debug("Extracted text from completions response", { length: text.length });
+        } else {
+          throw this.createError("Invalid completions response format from OpenAI API", 400, parsedResponse.choices[0]);
+        }
       }
-    } catch (error) {
-      throw new Error(`Error calling OpenAI API: ${error}`);
+        
+      return {
+        text: text,
+        usage: parsedResponse.usage || {}
+      };
+    } catch (error: any) {
+      if (error.message && error.message.includes('OpenAI API')) {
+        throw error; // Re-throw our own formatted errors
+      }
+      LLMLogger.error("Raw API response:", response.data);
+      throw this.createError(`Error parsing OpenAI response: ${error.message}`, 500);
     }
   }
   
