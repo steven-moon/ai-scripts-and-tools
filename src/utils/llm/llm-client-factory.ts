@@ -154,10 +154,26 @@ export class LLMClientFactory {
    * @returns The LLM client
    */
   public createClient(overrideConfig: Partial<LLMConfig> = {}): BaseLLMClient {
-    // Merge default config with any overrides
+    // Always check if there's a provider in process.env that should override everything else
+    const envProvider = process.env.LLM_PROVIDER as LLMProviderType;
+    if (envProvider) {
+      console.log(`Using provider from environment variable: "${envProvider}"`);
+      this.updateConfig({ provider: envProvider });
+    }
+    
+    // If overrideConfig contains a provider, apply it (it takes precedence over env vars)
+    if (overrideConfig.provider) {
+      console.log(`Using provider from override config: "${overrideConfig.provider}"`);
+      this.updateConfig({ provider: overrideConfig.provider });
+    }
+    
+    // Then merge all configs
     const config = { ...this.config, ...overrideConfig };
     
     const { provider } = config;
+    
+    // Debug the provider being used
+    console.log(`Creating client using provider: "${provider}"`);
     
     // Create client based on provider
     switch (provider) {
@@ -243,5 +259,12 @@ export class LLMClientFactory {
    */
   public updateConfig(newConfig: Partial<LLMConfig>): void {
     this.config = { ...this.config, ...newConfig };
+  }
+  
+  /**
+   * Reset and reload configuration from .env file
+   */
+  public resetConfig(): void {
+    this.loadConfig();
   }
 } 

@@ -23,6 +23,12 @@ export interface OpenAIClientOptions extends LLMClientOptions {
 export class OpenAILLMClient extends BaseLLMClient {
   private static DEFAULT_MODEL = 'gpt-3.5-turbo-instruct';
   private static DEFAULT_ENDPOINT = 'https://api.openai.com/v1/completions';
+  private static CHAT_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
+  
+  // List of models that require the chat API
+  private static CHAT_MODELS = [
+    'gpt-4', 'gpt-4-turbo', 'gpt-4o', 'gpt-3.5-turbo', 'gpt-4o-2024'
+  ];
   
   constructor(options: OpenAIClientOptions) {
     super({
@@ -36,25 +42,60 @@ export class OpenAILLMClient extends BaseLLMClient {
     }
   }
   
+  /**
+   * Determine if a model requires the chat completions API
+   */
+  private isChatModel(model: string): boolean {
+    return OpenAILLMClient.CHAT_MODELS.some(chatModel => 
+      model.toLowerCase().includes(chatModel.toLowerCase())
+    );
+  }
+  
   public async getCompletion(prompt: string, overrideOptions?: Partial<LLMClientOptions>): Promise<LLMCompletionResult> {
     const options = {
       ...this.options,
       ...overrideOptions
     };
     
-    const { model, maxTokens, temperature, apiKey, endpoint } = options;
+    const { model, maxTokens, temperature, apiKey } = options;
+    
+    // Determine if we need to use the chat API based on the model name
+    const usesChatAPI = this.isChatModel(model || '');
+    
+    // Set the correct endpoint based on the model type
+    const endpoint = usesChatAPI ? OpenAILLMClient.CHAT_ENDPOINT : options.endpoint;
+    
+    console.log(`Using OpenAI ${usesChatAPI ? 'chat' : 'completions'} API for model: ${model}`);
     
     // Create a temporary file to store the request body
     const tempDir = os.tmpdir();
     const tempFile = path.join(tempDir, `openai-request-${Date.now()}.json`);
     
-    // Create the request body (OpenAI format)
-    const requestBody = {
-      model: model,
-      prompt: prompt,
-      max_tokens: maxTokens,
-      temperature: temperature
-    };
+    // Create the request body based on the API type
+    let requestBody;
+    
+    if (usesChatAPI) {
+      // Chat completions format
+      requestBody = {
+        model: model,
+        messages: [
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        max_tokens: maxTokens,
+        temperature: temperature
+      };
+    } else {
+      // Regular completions format
+      requestBody = {
+        model: model,
+        prompt: prompt,
+        max_tokens: maxTokens,
+        temperature: temperature
+      };
+    }
     
     // Write the request body to the temporary file
     fs.writeFileSync(tempFile, JSON.stringify(requestBody, null, 2), 'utf8');
@@ -68,6 +109,13 @@ export class OpenAILLMClient extends BaseLLMClient {
       // Clean up the temporary file
       fs.unlinkSync(tempFile);
       
+      // Debug the raw response to see what we're getting
+      if (response.length < 1000) {
+        console.log("Raw API response:", response);
+      } else {
+        console.log(`Raw API response length: ${response.length} characters`);
+      }
+      
       try {
         // Parse the response
         const parsedResponse = JSON.parse(response);
@@ -77,8 +125,32 @@ export class OpenAILLMClient extends BaseLLMClient {
         }
         
         if (parsedResponse && parsedResponse.choices && parsedResponse.choices.length > 0) {
+          // Debug the choices structure
+          console.log("API response structure:", JSON.stringify(parsedResponse.choices[0], null, 2));
+          
+          // Extract text based on API type
+          let text = '';
+          
+          if (usesChatAPI) {
+            if (parsedResponse.choices[0].message && parsedResponse.choices[0].message.content) {
+              text = parsedResponse.choices[0].message.content.trim();
+              console.log("Extracted text from chat response:", text);
+            } else {
+              console.error("Chat response format unexpected:", JSON.stringify(parsedResponse.choices[0]));
+              throw new Error("Invalid chat response format from OpenAI API");
+            }
+          } else {
+            if (parsedResponse.choices[0].text) {
+              text = parsedResponse.choices[0].text.trim();
+              console.log("Extracted text from completions response:", text);
+            } else {
+              console.error("Completions response format unexpected:", JSON.stringify(parsedResponse.choices[0]));
+              throw new Error("Invalid completions response format from OpenAI API");
+            }
+          }
+            
           return {
-            text: parsedResponse.choices[0].text.trim(),
+            text: text,
             usage: parsedResponse.usage || {}
           };
         } else {

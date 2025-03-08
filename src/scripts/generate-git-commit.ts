@@ -27,6 +27,15 @@ function truncateText(text: string, maxLength: number): string {
  * @returns Properly formatted commit message
  */
 function processCommitMessage(message: string): string {
+  // Debug the incoming message
+  console.log("Raw commit message length:", message.length);
+  
+  // Handle empty or extremely short responses
+  if (!message || message.trim().length < 5) {
+    console.warn("Warning: Received very short or empty commit message from LLM");
+    return "Update project files\n\nThis commit includes various updates and changes to project files.";
+  }
+  
   // Replace literal "\n" with actual newlines
   let processed = message.replace(/\\n/g, '\n');
   
@@ -43,6 +52,10 @@ function processCommitMessage(message: string): string {
   processed = processed.replace(/^```[\w]*$/gm, '');
   processed = processed.replace(/^```$/gm, '');
   
+  // Handle prefixes that some models might add
+  processed = processed.replace(/^Here's a commit message:$/gim, '');
+  processed = processed.replace(/^Commit message:$/gim, '');
+  
   // Ensure proper spacing between sections
   processed = processed.replace(/^([A-Z][^:]+):\s*$/gm, '\n$1:\n');
   
@@ -52,6 +65,13 @@ function processCommitMessage(message: string): string {
   // Clean up any leading/trailing whitespace
   processed = processed.trim();
   
+  // Enforce a sensible minimum length
+  if (processed.length < 10) {
+    console.warn("Warning: Processed commit message is too short, using default message");
+    return "Update project files\n\nThis commit includes various updates and changes to project files.";
+  }
+  
+  console.log("Processed commit message:", processed);
   return processed;
 }
 
@@ -211,7 +231,12 @@ function displayProviderInfo(factory: LLMClientFactory, provider?: LLMProviderTy
  * Generate commit messages based on staged changes using a configured LLM
  */
 async function main() {
+  // Parse command line arguments
   const args = process.argv.slice(2);
+  
+  // Debug the received arguments
+  console.log('DEBUG: Received arguments:', args);
+  
   let templateFile = '';
   let provider: LLMProviderType | undefined;
   let model: string | undefined;
@@ -219,17 +244,39 @@ async function main() {
   
   // Parse command line arguments
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--provider' || args[i] === '-p') {
-      provider = args[i + 1] as LLMProviderType;
-      i++;
-    } else if (args[i] === '--model' || args[i] === '-m') {
-      model = args[i + 1];
-      i++;
-    } else if (args[i] === '--copy' || args[i] === '-c') {
+    const arg = args[i];
+    
+    // Handle the case where '--provider openai' is passed as a single argument
+    if (arg.startsWith('--provider ')) {
+      const providerValue = arg.substring('--provider '.length).trim();
+      provider = providerValue as LLMProviderType;
+      console.log(`Provider set from combined argument: "${provider}"`);
+    } 
+    // Handle standard separate arguments
+    else if (arg === '--provider' || arg === '-p') {
+      if (i + 1 < args.length) {
+        provider = args[i + 1] as LLMProviderType;
+        console.log(`Provider set from separate arguments: "${provider}"`);
+        i++;
+      }
+    } else if (arg.startsWith('--model ')) {
+      model = arg.substring('--model '.length).trim();
+    } else if (arg === '--model' || arg === '-m') {
+      if (i + 1 < args.length) {
+        model = args[i + 1];
+        i++;
+      }
+    } else if (arg === '--copy' || arg === '-c') {
       shouldCopy = true;
     } else if (!templateFile) {
-      templateFile = args[i];
+      templateFile = arg;
     }
+  }
+  
+  // Explicitly set the environment variable if a provider was specified
+  if (provider) {
+    process.env.LLM_PROVIDER = provider;
+    console.log(`Set LLM_PROVIDER environment variable to: "${provider}"`);
   }
 
   if (!templateFile) {
@@ -244,6 +291,10 @@ async function main() {
 
   // Read template file
   let template = fs.readFileSync(templateFile, 'utf8');
+  
+  // Debug the configuration before any overrides
+  const initialConfig = LLMClientFactory.getInstance().getConfig();
+  console.log(`DEBUG: Initial provider before override: "${initialConfig.provider}"`);
 
   // Get git diff (limit to a reasonable size)
   const gitDiff = truncateText(runCommand('git diff --cached'), 8000);
@@ -271,44 +322,60 @@ async function main() {
   codeContext = truncateText(codeContext, 4000);
 
   // Replace placeholders in template
-  template = template.replace('{{CODE_DIFF}}', gitDiff).replace('{{CODE_CONTEXT}}', codeContext);
+  let generatedCommitMessage = template.replace('{{CODE_DIFF}}', gitDiff).replace('{{CODE_CONTEXT}}', codeContext);
 
   console.log("Generating commit message...");
   
   try {
     // Get the LLM client factory and display current config
     const factory = LLMClientFactory.getInstance();
+    console.log(`DEBUG: Before override - Current provider: "${factory.getConfig().provider}"`);
+    
+    // Override the default provider if one is specified
+    if (provider) {
+      // Reset the config to ensure we start with a clean state
+      factory.resetConfig();
+      
+      // Explicitly override the provider in the factory configuration
+      factory.updateConfig({ provider });
+      console.log(`Provider override: Using ${provider} instead of default provider`);
+    } else if (process.env.AI_SCRIPTS_PROVIDER_OVERRIDE === 'openai') {
+      // Special case for the gcaio alias - force OpenAI
+      console.log('DEBUG: Using gcaio alias - forcing OpenAI provider');
+      factory.updateConfig({ provider: 'openai' });
+    }
     
     // Display provider and model info
     displayProviderInfo(factory, provider, model);
     
     // Get the raw response from the LLM
-    let rawCommitMessage = await queryLLM(template, {
+    let rawCommitMessage = await queryLLM(generatedCommitMessage, {
       maxTokens: 2000,
       temperature: 0.5,
-      provider: provider,
+      // Explicitly set the provider to ensure it's used
+      provider: provider || factory.getConfig().provider,
       model: model
     });
 
     // Process the message to fix formatting issues
-    let generatedCommitMessage = processCommitMessage(rawCommitMessage);
+    let processedCommitMessage = processCommitMessage(rawCommitMessage);
 
     console.log('\nGenerated Commit Message:\n');
-    console.log(generatedCommitMessage);
+    console.log(processedCommitMessage);
     console.log('\n');
 
     // Copy to clipboard if requested
     if (shouldCopy) {
-      copyToClipboard(generatedCommitMessage);
+      copyToClipboard(processedCommitMessage);
     }
     
     const action = await askQuestion('What would you like to do? (u)se as is, (e)dit, (c)opy to clipboard, or (a)bort: ');
     
     if (action.toLowerCase() === 'e') {
       try {
-        generatedCommitMessage = await editInEditor(generatedCommitMessage);
+        processedCommitMessage = await editInEditor(processedCommitMessage);
         console.log('\nEdited Commit Message:\n');
-        console.log(generatedCommitMessage);
+        console.log(processedCommitMessage);
         console.log('\n');
         
         const useEdited = await askQuestion('Use this edited commit message? (y/N): ');
@@ -325,7 +392,7 @@ async function main() {
         }
       }
     } else if (action.toLowerCase() === 'c') {
-      copyToClipboard(generatedCommitMessage);
+      copyToClipboard(processedCommitMessage);
       console.log('Commit message copied to clipboard. No commit was made.');
       return;
     } else if (action.toLowerCase() !== 'u') {
@@ -336,7 +403,7 @@ async function main() {
     // Proceed with commit - ensure we're passing the message correctly to git
     // Using a temporary file approach to avoid shell escaping issues
     const tempCommitFile = path.join(os.tmpdir(), `git-commit-msg-${Date.now()}.txt`);
-    fs.writeFileSync(tempCommitFile, generatedCommitMessage, 'utf8');
+    fs.writeFileSync(tempCommitFile, processedCommitMessage, 'utf8');
     runCommand(`git commit -F "${tempCommitFile}"`);
     fs.unlinkSync(tempCommitFile); // Clean up
     

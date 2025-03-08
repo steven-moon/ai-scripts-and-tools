@@ -11,7 +11,8 @@ export * from './llm/gemini-llm-client';
 export * from './llm/custom-llm-client';
 export * from './llm/llm-client-factory';
 
-import { LLMClientFactory, LLMConfig } from './llm/llm-client-factory';
+import { LLMClientFactory, LLMProviderType, LLMConfig } from './llm/llm-client-factory';
+import { runCommand } from './shell';
 
 export interface LLMOptions {
   model?: string;
@@ -35,54 +36,77 @@ export async function queryLLM(
     // Get the LLM client factory instance
     const factory = LLMClientFactory.getInstance();
     
-    // Create config from options
-    const config: Partial<LLMConfig> = {
-      provider: options.provider,
-      model: options.model,
-      maxTokens: options.maxTokens,
-      temperature: options.temperature
-    };
+    // Store the original configuration in case we need to restore it
+    const originalConfig = { ...factory.getConfig() };
     
-    // If a specific endpoint is provided, set it for the appropriate provider
-    if (options.endpoint) {
-      switch (options.provider) {
-        case 'openai':
-          config.openaiEndpoint = options.endpoint;
-          break;
-        case 'anthropic':
-          config.anthropicEndpoint = options.endpoint;
-          break;
-        case 'gemini':
-          config.geminiEndpoint = options.endpoint;
-          break;
-        case 'custom':
-          config.customEndpoint = options.endpoint;
-          break;
-        case 'local':
-        default:
-          config.localEndpoint = options.endpoint;
-          break;
+    try {
+      // Check environment variables first
+      const envProvider = process.env.LLM_PROVIDER as LLMProviderType;
+      if (envProvider) {
+        console.log(`queryLLM found provider in environment: "${envProvider}"`);
+        factory.updateConfig({ provider: envProvider });
       }
+      
+      // Apply all option overrides directly to the factory configuration
+      // These take precedence over environment variables
+      if (options.provider) {
+        console.log(`queryLLM using provider from options: "${options.provider}"`);
+        factory.updateConfig({ provider: options.provider });
+      }
+      
+      if (options.model) {
+        factory.updateConfig({ model: options.model });
+      }
+      
+      if (options.temperature !== undefined) {
+        factory.updateConfig({ temperature: options.temperature });
+      }
+      
+      if (options.maxTokens !== undefined) {
+        factory.updateConfig({ maxTokens: options.maxTokens });
+      }
+      
+      // Apply endpoint changes if provided
+      if (options.endpoint) {
+        switch (options.provider) {
+          case 'openai':
+            factory.updateConfig({ openaiEndpoint: options.endpoint });
+            break;
+          case 'anthropic':
+            factory.updateConfig({ anthropicEndpoint: options.endpoint });
+            break;
+          case 'gemini':
+            factory.updateConfig({ geminiEndpoint: options.endpoint });
+            break;
+          case 'custom':
+            factory.updateConfig({ customEndpoint: options.endpoint });
+            break;
+          case 'local':
+          default:
+            factory.updateConfig({ localEndpoint: options.endpoint });
+            break;
+        }
+      }
+      
+      // Create the client using the factory's updated configuration
+      // This will use the configuration we just updated
+      const client = factory.createClient();
+      
+      console.log(`Using LLM provider: ${client.getName()}`);
+      
+      // Get completion
+      const result = await client.getCompletion(prompt);
+      
+      // Log usage if available
+      if (result.usage) {
+        console.log(`Tokens used: ${result.usage.totalTokens || 'Unknown'} (Prompt: ${result.usage.promptTokens || 'Unknown'}, Completion: ${result.usage.completionTokens || 'Unknown'})`);
+      }
+      
+      return result.text;
+    } finally {
+      // Restore the original configuration to prevent side effects
+      factory.updateConfig(originalConfig);
     }
-    
-    // Create the appropriate client
-    const client = factory.createClient(config);
-    
-    console.log(`Using LLM provider: ${client.getName()}`);
-    
-    // Get completion
-    const result = await client.getCompletion(prompt, {
-      maxTokens: options.maxTokens,
-      temperature: options.temperature,
-      model: options.model
-    });
-    
-    // Log usage if available
-    if (result.usage) {
-      console.log(`Tokens used: ${result.usage.totalTokens || 'Unknown'} (Prompt: ${result.usage.promptTokens || 'Unknown'}, Completion: ${result.usage.completionTokens || 'Unknown'})`);
-    }
-    
-    return result.text;
   } catch (error) {
     throw new Error(`Error querying LLM: ${error}`);
   }

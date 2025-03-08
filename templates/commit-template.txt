@@ -34,4 +34,12 @@ Here's the git diff:
 Here's additional context about the files changed:
 {{CODE_CONTEXT}}
 
-Format your response as a plain text commit message only following exactly the format described above. 
+IMPORTANT INSTRUCTIONS:
+1. Return ONLY the commit message text itself, without any surrounding quotes, backticks, or explanations.
+2. Your entire response will be used directly as the commit message.
+3. Don't include phrases like "Here's a commit message:" or any other prefixes.
+4. If the changes are minor or the diff is empty, still provide a meaningful commit message.
+5. Don't include any markdown formatting except for bullet points.
+6. The response should start directly with the commit summary line.
+
+The commit message must directly follow this exact format - do not include any additional text before or after the message.
