@@ -38,6 +38,12 @@ Each LLM provider can have a default model configured in the `.env` file.
 
 [See detailed configuration documentation](documents/DEFAULT-MODEL-CONFIGURATION-DOCS.md)
 
+### Command Line Setup
+
+To use the scripts from any directory, add them to your shell configuration file.
+
+[See command line setup instructions](documents/COMMAND-LINE-SETUP-DOCS.md)
+
 ## Tests
 
 To test all LLM providers, use the test script:
