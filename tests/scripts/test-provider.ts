@@ -4,7 +4,7 @@
  * This script tests the LLM client factory provider configuration.
  */
 
-import { LLMClientFactory, LLMProviderType } from '../utils/llm';
+import { LLMClientFactory, LLMProviderType } from '../../src/utils/llm';
 
 async function main() {
   // Parse command line arguments
