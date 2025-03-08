@@ -21,6 +21,40 @@ function truncateText(text: string, maxLength: number): string {
 }
 
 /**
+ * Process the commit message to fix formatting issues
+ * @param message - The raw commit message from LLM
+ * @returns Properly formatted commit message
+ */
+function processCommitMessage(message: string): string {
+  // Replace literal "\n" with actual newlines
+  let processed = message.replace(/\\n/g, '\n');
+  
+  // Replace literal "\n\n" to avoid double newlines
+  processed = processed.replace(/\\n\\n/g, '\n\n');
+  
+  // Fix common formatting issues
+  
+  // Fix multiple consecutive newlines (more than 2)
+  processed = processed.replace(/\n{3,}/g, '\n\n');
+  
+  // Remove any 'backtick' code block markers that might be included
+  processed = processed.replace(/^```[\s\S]*?```$/gm, '');
+  processed = processed.replace(/^```[\w]*$/gm, '');
+  processed = processed.replace(/^```$/gm, '');
+  
+  // Ensure proper spacing between sections
+  processed = processed.replace(/^([A-Z][^:]+):\s*$/gm, '\n$1:\n');
+  
+  // Make sure bullet points are properly formatted
+  processed = processed.replace(/^[*•]\s*/gm, '- ');
+  
+  // Clean up any leading/trailing whitespace
+  processed = processed.trim();
+  
+  return processed;
+}
+
+/**
  * Copy text to clipboard
  * @param text - Text to copy to clipboard
  */
@@ -168,10 +202,14 @@ async function main() {
   
   // Query the LLM
   try {
-    let generatedCommitMessage = await queryLocalLLM(template, {
+    // Get the raw response from the LLM
+    let rawCommitMessage = await queryLocalLLM(template, {
       maxTokens: 2000,
       temperature: 0.5
     });
+
+    // Process the message to fix formatting issues
+    let generatedCommitMessage = processCommitMessage(rawCommitMessage);
 
     console.log('\nGenerated Commit Message:\n');
     console.log(generatedCommitMessage);
@@ -213,8 +251,13 @@ async function main() {
       return;
     }
 
-    // Proceed with commit
-    runCommand(`git commit -m ${JSON.stringify(generatedCommitMessage)}`);
+    // Proceed with commit - ensure we're passing the message correctly to git
+    // Using a temporary file approach to avoid shell escaping issues
+    const tempCommitFile = path.join(os.tmpdir(), `git-commit-msg-${Date.now()}.txt`);
+    fs.writeFileSync(tempCommitFile, generatedCommitMessage, 'utf8');
+    runCommand(`git commit -F "${tempCommitFile}"`);
+    fs.unlinkSync(tempCommitFile); // Clean up
+    
     console.log('Commit successful.');
   } catch (error) {
     console.error(error);
