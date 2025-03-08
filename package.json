@@ -1,0 +1,30 @@
+{
+  "name": "ai-scripts-and-tools",
+  "version": "1.0.0",
+  "description": "A collection of TypeScript-based scripts and tools for AI-related tasks",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "script": "ts-node src/scripts/$1",
+    "lint": "tsc --noEmit",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/steven-moon/ai-scripts-and-tools.git"
+  },
+  "keywords": ["ai", "tools", "scripts", "typescript"],
+  "author": "Steven Moon",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/steven-moon/ai-scripts-and-tools/issues"
+  },
+  "homepage": "https://github.com/steven-moon/ai-scripts-and-tools#readme",
+  "devDependencies": {
+    "@types/node": "^20.x.x",
+    "ts-node": "^10.x.x",
+    "typescript": "^5.x.x"
+  }
+}
