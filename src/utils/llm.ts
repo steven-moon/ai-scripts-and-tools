@@ -3,6 +3,9 @@
  */
 
 import { runCommand } from './shell';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 
 interface LLMOptions {
   model?: string;
@@ -28,18 +31,43 @@ export async function queryLocalLLM(
     endpoint = 'http://127.0.0.1:1234/v1/completions'
   } = options;
 
-  const response = runCommand(
-    `curl -X POST ${endpoint} -H "Content-Type: application/json" -d '{
-      "model": "${model}",
-      "prompt": ${JSON.stringify(prompt)},
-      "max_tokens": ${maxTokens},
-      "temperature": ${temperature}
-    }'`
-  );
-
+  // Create a temporary file to store the request body
+  const tempDir = os.tmpdir();
+  const tempFile = path.join(tempDir, `llm-request-${Date.now()}.json`);
+  
+  // Create the request body
+  const requestBody = {
+    model: model,
+    prompt: prompt,
+    max_tokens: maxTokens,
+    temperature: temperature
+  };
+  
+  // Write the request body to the temporary file
+  fs.writeFileSync(tempFile, JSON.stringify(requestBody, null, 2), 'utf8');
+  
   try {
-    return JSON.parse(response).choices[0].text.trim();
+    // Use the temp file in the curl command
+    const response = runCommand(
+      `curl -X POST ${endpoint} -H "Content-Type: application/json" -d @${tempFile}`
+    );
+    
+    // Clean up the temporary file
+    fs.unlinkSync(tempFile);
+    
+    try {
+      // Parse the response
+      const parsedResponse = JSON.parse(response);
+      if (parsedResponse && parsedResponse.choices && parsedResponse.choices.length > 0) {
+        return parsedResponse.choices[0].text.trim();
+      } else {
+        throw new Error("Invalid response format from LLM API");
+      }
+    } catch (error) {
+      console.error("Raw API response:", response);
+      throw new Error(`Error parsing LLM response: ${error}`);
+    }
   } catch (error) {
-    throw new Error(`Error parsing LLM response: ${error}`);
+    throw new Error(`Error calling LLM API: ${error}`);
   }
 } 
