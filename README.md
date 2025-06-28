@@ -54,6 +54,25 @@ npm run summary -- --details
 npm run summary -- --clipboard
 ```
 
+### Summarize Folder Contents
+
+```bash
+# Summarize a directory (respects .gitignore)
+npm run summarize -- <directory-path>
+
+# Examples:
+npm run summarize -- src                    # Summarize source code
+npm run summarize -- _docs                  # Summarize documentation
+npm run summarize -- /path/to/other/project # Summarize external project
+```
+
+**Features:**
+- ✅ Respects `.gitignore` patterns
+- ✅ Filters text files only (`.ts`, `.js`, `.json`, `.md`, `.txt`, etc.)
+- ✅ Structured output with file headers
+- ✅ Error handling for unreadable files
+- ✅ Works with any directory path
+
 ## 🔧 Development
 
 ### Prerequisites
@@ -74,6 +93,7 @@ npm run clean        # Clean build artifacts
 # Scripts
 npm run commit       # Generate git commit message
 npm run summary      # Generate code summary
+npm run summarize    # Summarize folder contents
 npm run test-llm     # Test LLM providers
 
 # Testing
@@ -103,6 +123,7 @@ See [templates/new-ai-script.ts](templates/new-ai-script.ts) for a complete exam
 - **[Quick Start Guide](QUICK-START.md)** - Get up and running in 5 minutes
 - **[Git Commit Generation](_docs/GENERATE-GIT-COMMIT-DOCS.md)** - Detailed guide for commit message generation
 - **[Code Summary Generation](_docs/GENERATE-CODE-SUMMARY-DOCS.md)** - Guide for codebase summaries
+- **[Folder Summarization](_docs/SUMMARIZE-FOLDER-DOCS.md)** - Guide for folder content summarization
 - **[Configuration Guide](_docs/DEFAULT-MODEL-CONFIGURATION-DOCS.md)** - LLM provider configuration
 - **[Command Line Setup](_docs/COMMAND-LINE-SETUP-DOCS.md)** - Shell integration instructions
 - **[Agent Development Workflow](_docs/Agent_Development_Workflow.md)** - Advanced development workflow
@@ -114,7 +135,8 @@ ai-scripts-and-tools/
 ├── src/                    # Source code
 │   ├── scripts/           # Main scripts
 │   │   ├── generate-git-commit.ts
-│   │   └── generate-code-summary.ts
+│   │   ├── generate-code-summary.ts
+│   │   └── summarize-folder.ts
 │   └── utils/             # Shared utilities
 │       ├── llm/           # LLM provider implementations
 │       ├── httpClient.ts  # HTTP client utilities

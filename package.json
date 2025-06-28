@@ -12,6 +12,7 @@
     "clean": "rm -rf dist node_modules/.cache",
     "commit": "ts-node src/scripts/generate-git-commit.ts",
     "summary": "ts-node src/scripts/generate-code-summary.ts",
+    "summarize": "ts-node src/scripts/summarize-folder.ts",
     "test-llm": "ts-node tests/scripts/test-llm-providers.ts"
   },
   "repository": {
@@ -36,8 +37,11 @@
     "typescript": "^5.x.x"
   },
   "dependencies": {
+    "@types/fs-extra": "^11.0.4",
     "axios": "^1.6.7",
     "dotenv": "^16.4.7",
+    "fast-glob": "^3.3.3",
+    "fs-extra": "^11.3.0",
     "ignore": "^7.0.3"
   }
 }
