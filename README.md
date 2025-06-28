@@ -1,108 +1,155 @@
 # AI Scripts and Tools
 
-A collection of TypeScript-based scripts and tools for AI-related tasks, including code generation, prompt engineering, and model interaction utilities.
+A collection of TypeScript-based scripts and tools for AI-related tasks, including git commit message generation, code summaries, and LLM provider integrations.
 
-## Installation
+## 🚀 Quick Start
 
-Clone the repository and install dependencies:
+**Get started in 5 minutes!** See [QUICK-START.md](QUICK-START.md) for detailed setup instructions.
 
 ```bash
-git clone https://github.com/steven-moon/ai-scripts-and-tools.git
-cd ai-scripts-and-tools
+# 1. Install dependencies
 npm install
+
+# 2. Configure your LLM provider
+cp env.example .env
+# Edit .env and add your API keys
+
+# 3. Test your setup
+npm run test-llm
 ```
 
-## Available Scripts
+## 🎯 Core Features
 
-This repository includes the following AI-powered scripts:
+- 🤖 **AI-Powered Git Commits**: Generate intelligent commit messages using multiple LLM providers
+- 📊 **Code Summaries**: Create comprehensive codebase summaries with file analysis
+- 🔌 **Multi-Provider Support**: OpenAI, Anthropic, Google Gemini, Local LLMs, and custom providers
+- 🚀 **Agent-Driven Development**: Automated build, test, and validation workflows
+- 📝 **TypeScript-First**: Built with TypeScript for type safety and developer experience
 
-### Generate Git Commit
+## 📋 Available Scripts
 
-Automatically generates commit messages based on staged changes using AI through multiple LLM providers (Local LLMs, OpenAI, Anthropic, Google Gemini, Custom Provider).
+### Generate Git Commit Message
 
-[See detailed documentation](documents/GENERATE-GIT-COMMIT-DOCS.md)
+```bash
+# Using default provider
+npm run commit
+
+# Using specific provider
+npm run commit -- --provider openai --model gpt-4-turbo
+
+# Copy to clipboard
+npm run commit -- --copy
+```
 
 ### Generate Code Summary
 
-Automatically generates a summary of your codebase, including information about files, directories, and optionally full file contents.
-
-[See detailed documentation](documents/GENERATE-CODE-SUMMARY-DOCS.md)
-
-## Configuration
-
-Each script can be configured through environment variables in your `.env` file (copy from `.env.example`).
-
-### Default Model Configuration
-
-Each LLM provider can have a default model configured in the `.env` file.
-
-[See detailed configuration documentation](documents/DEFAULT-MODEL-CONFIGURATION-DOCS.md)
-
-### Command Line Setup
-
-To use the scripts from any directory, add them to your shell configuration file.
-
-[See command line setup instructions](documents/COMMAND-LINE-SETUP-DOCS.md)
-
-## Tests
-
-To test all LLM providers, use the test script:
-
 ```bash
-ts-node tests/scripts/test-llm-providers.ts
+# Basic summary
+npm run summary
+
+# Detailed summary with file contents
+npm run summary -- --details
+
+# Copy to clipboard
+npm run summary -- --clipboard
 ```
 
-For more details on testing options, see the [tests README](tests/README.md).
+## 🔧 Development
 
-## Development
+### Prerequisites
 
-### Setup
+- Node.js 18+
+- npm or yarn
+- TypeScript 5.x
 
-This project uses TypeScript. To set up the development environment:
+### Available Commands
 
-1. Install dependencies:
+```bash
+# Development
+npm run dev          # Run in development mode
+npm run build        # Build TypeScript to JavaScript
+npm run lint         # Check TypeScript code quality
+npm run clean        # Clean build artifacts
+
+# Scripts
+npm run commit       # Generate git commit message
+npm run summary      # Generate code summary
+npm run test-llm     # Test LLM providers
+
+# Testing
+npm test             # Run test suite
+```
+
+### Adding New AI Scripts
+
+1. **Use the template:**
    ```bash
-   npm install
+   cp templates/new-ai-script.ts src/scripts/my-ai-tool.ts
    ```
 
-2. Build the project:
-   ```bash
-   npm run build
+2. **Add to package.json:**
+   ```json
+   "scripts": {
+     "my-tool": "ts-node src/scripts/my-ai-tool.ts"
+   }
    ```
 
-3. Run scripts directly:
-   ```bash
-   npm run script -- <script-name> [arguments]
-   ```
+3. **Customize the script** for your specific use case
 
-### Project Structure
+See [templates/new-ai-script.ts](templates/new-ai-script.ts) for a complete example.
+
+## 📚 Documentation
+
+- **[Quick Start Guide](QUICK-START.md)** - Get up and running in 5 minutes
+- **[Git Commit Generation](_docs/GENERATE-GIT-COMMIT-DOCS.md)** - Detailed guide for commit message generation
+- **[Code Summary Generation](_docs/GENERATE-CODE-SUMMARY-DOCS.md)** - Guide for codebase summaries
+- **[Configuration Guide](_docs/DEFAULT-MODEL-CONFIGURATION-DOCS.md)** - LLM provider configuration
+- **[Command Line Setup](_docs/COMMAND-LINE-SETUP-DOCS.md)** - Shell integration instructions
+- **[Agent Development Workflow](_docs/Agent_Development_Workflow.md)** - Advanced development workflow
+
+## 🏗️ Project Structure
 
 ```
 ai-scripts-and-tools/
-├── src/                # Source code
-│   ├── index.ts        # Entry point
-│   ├── scripts/        # Individual scripts
-│   │   └── generate-git-commit.ts
-│   └── utils/          # Shared utilities
-│       └── llm/        # LLM provider implementations
-├── templates/          # Prompt templates
-├── documents/          # Detailed documentation
-├── tests/              # Tests for LLM providers
-├── dist/               # Compiled JavaScript (generated)
-├── tsconfig.json       # TypeScript configuration
-└── package.json        # Project metadata and dependencies
+├── src/                    # Source code
+│   ├── scripts/           # Main scripts
+│   │   ├── generate-git-commit.ts
+│   │   └── generate-code-summary.ts
+│   └── utils/             # Shared utilities
+│       ├── llm/           # LLM provider implementations
+│       ├── httpClient.ts  # HTTP client utilities
+│       ├── clipboard.ts   # Clipboard operations
+│       └── shell.ts       # Shell utilities
+├── templates/             # Prompt templates and script templates
+├── _docs/                 # Documentation
+├── tests/                 # Test files
+├── examples/              # Example outputs
+├── env.example            # Environment configuration template
+├── QUICK-START.md         # Quick start guide
+└── templates/new-ai-script.ts  # Template for new AI scripts
 ```
 
-### Adding New Scripts
+## 🎯 Supported LLM Providers
 
-To add a new script:
+- **Local LLMs** (Ollama, LM Studio) - Default
+- **OpenAI** (GPT models)
+- **Anthropic** (Claude models)
+- **Google Gemini**
+- **Custom providers** (OpenAI API compatible)
 
-1. Create a new TypeScript file in the `src/scripts/` directory
-2. Import and use shared utilities as needed
-3. Build the project with `npm run build`
-4. Run your script with `npm run script -- <your-script-name> [arguments]`
-5. Create detailed documentation in the `documents` folder
+## 🤝 Contributing
 
-## License
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests for new functionality
+5. Update documentation
+6. Submit a pull request
 
-MIT
+## 📄 License
+
+MIT License - see [LICENSE](LICENSE) file for details.
+
+---
+
+*Built with TypeScript, Node.js, and AI-powered development tools.*

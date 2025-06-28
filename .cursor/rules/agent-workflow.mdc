@@ -1,0 +1,174 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Agent-Driven Development Workflow
+
+## Core Principle: Code → Lint → Build → Test → Validate
+
+**ALWAYS follow this workflow after ANY code changes:**
+
+1. **Make code changes** using edit_file tool
+2. **Lint the project** using npm run lint
+3. **Build the project** using npm run build
+4. **Run tests** to verify functionality
+5. **Test LLM providers** to ensure integrations work
+6. **Report results** to user for testing
+
+## Required Workflow Commands
+
+### After Code Changes (MANDATORY)
+```bash
+# 1. Lint TypeScript code
+npm run lint
+
+# 2. Build TypeScript project
+npm run build
+
+# 3. Run tests
+npm test
+
+# 4. Test LLM providers (if applicable)
+ts-node tests/scripts/test-llm-providers.ts
+```
+
+### Quick Development Commands
+```bash
+# Clean build
+npm run clean
+rm -rf node_modules/.cache
+
+# Install dependencies
+npm install
+
+# Development mode
+npm run dev
+
+# Test specific provider
+ts-node tests/scripts/test-provider.ts openai
+```
+
+## Agent Behavior Rules
+
+### MANDATORY Actions After Code Changes:
+1. **ALWAYS** run lint command after editing TypeScript files
+2. **ALWAYS** run build command after lint passes
+3. **ALWAYS** run tests after build completes
+4. **ALWAYS** test LLM providers if changes affect LLM integration
+5. **ALWAYS** report build/test status to user
+6. **NEVER** ask user to run commands manually
+
+### Error Handling:
+- If lint fails: **IMMEDIATELY** analyze errors and fix TypeScript issues
+- If build fails: **IMMEDIATELY** analyze compilation errors and resolve
+- If tests fail: **IMMEDIATELY** investigate and resolve test failures
+- If LLM tests fail: **IMMEDIATELY** check API keys and endpoints
+
+### Communication Pattern:
+```
+✅ Code changes made
+🔍 Linting TypeScript...
+✅ Lint passed
+🔨 Building project...
+✅ Build successful
+🧪 Running tests...
+✅ Tests passed
+🔗 Testing LLM providers...
+✅ All providers working
+🎯 Ready for user testing
+```
+
+## Project-Specific Commands
+
+### Main Scripts
+```bash
+# Generate git commit message
+ts-node src/scripts/generate-git-commit.ts
+
+# Generate code summary
+ts-node src/scripts/generate-code-summary.ts
+
+# Test LLM providers
+ts-node tests/scripts/test-llm-providers.ts
+```
+
+### Development Tools
+```bash
+# TypeScript compilation check
+npx tsc --noEmit
+
+# Run with ts-node
+ts-node src/index.ts
+
+# Development server
+npm run dev
+```
+
+## Development Environment Setup
+
+### Required Tools:
+- Node.js 18+ with npm
+- TypeScript 5.x
+- ts-node for development
+- Git for version control
+
+### Environment Variables:
+```bash
+export NODE_ENV=development
+export TS_NODE_PROJECT=./tsconfig.json
+export AI_SCRIPTS_PATH="/Users/stevenmoon/GitRepo/ai-scripts-and-tools"
+```
+
+## Monitoring & Logging
+
+### Build Log Monitoring:
+```bash
+# Monitor build logs
+tail -f /tmp/ai-scripts-build.log
+
+# Monitor TypeScript compilation
+npx tsc --noEmit --listFiles
+
+# Monitor test results
+npm test -- --verbose
+```
+
+### LLM Provider Monitoring:
+```bash
+# Test all providers
+ts-node tests/scripts/test-llm-providers.ts
+
+# Test specific provider
+ts-node tests/scripts/test-provider.ts local
+```
+
+### Build Artifacts:
+- Build logs: `/tmp/ai-scripts-build.log`
+- Test results: `npm test` output
+- Compiled JS: `./dist/` directory
+
+## Integration with Existing Rules
+
+This workflow integrates with:
+- @typescript-style.mdc - TypeScript coding standards
+- @llm-architecture.mdc - LLM provider architecture
+- @node-cursor-tips.mdc - Node.js productivity tips
+
+## Success Metrics
+
+### Build Success Criteria:
+- ✅ Zero TypeScript compilation errors
+- ✅ Zero linting issues
+- ✅ All tests passing
+- ✅ LLM providers working
+- ✅ Scripts executing without errors
+
+### Performance Targets:
+- Build time: <5 seconds
+- Test execution: <10 seconds
+- Lint time: <2 seconds
+- LLM test time: <30 seconds
+
+---
+*Last updated: 2025-06-27*

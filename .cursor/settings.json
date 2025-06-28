@@ -1,0 +1,141 @@
+{
+  "cursor.agent.enabled": true,
+  "cursor.agent.autoRun": true,
+  "cursor.agent.autoRunOnSave": true,
+  "cursor.agent.autoRunOnFileChange": true,
+  "cursor.agent.autoRunOnTerminalCommand": true,
+  "cursor.agent.autoRunOnBuild": true,
+  "cursor.agent.autoRunOnTest": true,
+  
+  "cursor.agent.commands": {
+    "build": "npm run build",
+    "dev": "npm run dev",
+    "test": "npm test",
+    "lint": "npm run lint",
+    "clean": "rm -rf dist node_modules/.cache",
+    "install": "npm install",
+    "commit": "ts-node src/scripts/generate-git-commit.ts",
+    "summary": "ts-node src/scripts/generate-code-summary.ts",
+    "test-llm": "ts-node tests/scripts/test-llm-providers.ts"
+  },
+  
+  "cursor.agent.workflow": {
+    "onFileSave": [
+      "lint"
+    ],
+    "onTypeScriptFileChange": [
+      "lint",
+      "build"
+    ],
+    "onPackageFileChange": [
+      "install",
+      "build"
+    ]
+  },
+  
+  "cursor.agent.notifications": {
+    "buildSuccess": true,
+    "buildFailure": true,
+    "testSuccess": true,
+    "testFailure": true,
+    "lintSuccess": true,
+    "lintFailure": true
+  },
+  
+  "cursor.agent.logging": {
+    "enabled": true,
+    "level": "info",
+    "file": "/tmp/cursor-agent.log",
+    "maxSize": "10MB"
+  },
+  
+  "cursor.agent.autoFix": {
+    "buildErrors": true,
+    "testFailures": true,
+    "lintingIssues": true,
+    "formattingIssues": true
+  },
+  
+  "cursor.agent.testing": {
+    "autoRun": true,
+    "coverage": false,
+    "parallel": false,
+    "timeout": 300
+  },
+  
+  "cursor.agent.build": {
+    "autoClean": false,
+    "incremental": true,
+    "parallel": false,
+    "timeout": 600
+  },
+  
+  "cursor.agent.development": {
+    "autoSave": true,
+    "autoFormat": true,
+    "autoLint": true,
+    "autoCommit": false
+  },
+  
+  "cursor.agent.integration": {
+    "node": true,
+    "npm": true,
+    "typescript": true,
+    "git": true
+  },
+  
+  "cursor.agent.performance": {
+    "maxConcurrentTasks": 2,
+    "taskTimeout": 300,
+    "memoryLimit": "1GB",
+    "cpuLimit": "50%"
+  },
+  
+  "cursor.agent.security": {
+    "allowFileSystemAccess": true,
+    "allowNetworkAccess": true,
+    "allowTerminalAccess": true,
+    "allowNodeAccess": true
+  },
+  
+  "cursor.agent.customization": {
+    "projectRoot": "/Users/stevenmoon/GitRepo/ai-scripts-and-tools",
+    "packageManager": "npm",
+    "nodeVersion": "18+",
+    "typescriptVersion": "5.x"
+  },
+  
+  "cursor.agent.monitoring": {
+    "buildLogs": true,
+    "testLogs": true,
+    "lintLogs": true,
+    "systemLogs": false,
+    "performanceMetrics": true
+  },
+  
+  "cursor.agent.reporting": {
+    "buildReports": true,
+    "testReports": true,
+    "lintReports": true,
+    "performanceReports": true,
+    "errorReports": true
+  },
+  
+  "cursor.agent.automation": {
+    "autoRetry": true,
+    "maxRetries": 3,
+    "retryDelay": 5,
+    "autoRecovery": true,
+    "gracefulDegradation": true
+  },
+  
+  "cursor.agent.communication": {
+    "statusUpdates": true,
+    "progressIndicators": true,
+    "errorDetails": true,
+    "successConfirmations": true,
+    "userNotifications": true
+  },
+  
+  "cursor.agent.logDirectory": "/tmp"
+} 

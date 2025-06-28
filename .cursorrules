@@ -1,58 +1,78 @@
-Cursor Rules For AI
+# Cursor Rules for AI Scripts and Tools
 
-# Project Overview Rules
-- This project is a TypeScript-based collection of AI scripts and tools for generating git commit messages, code summaries, and interacting with various LLM providers.
-- The core scripts include `generate-git-commit.ts` for creating AI-assisted commit messages and `generate-code-summary.ts` for generating codebase summaries.
-- The project supports multiple LLM providers including Local LLMs, OpenAI, Anthropic, Google Gemini, and custom providers.
+## Project Overview
+- This is a TypeScript-based collection of AI scripts and tools for generating git commit messages, code summaries, and interacting with various LLM providers
+- Core scripts: `generate-git-commit.ts` (AI-assisted commit messages) and `generate-code-summary.ts` (codebase summaries)
+- Supports multiple LLM providers: Local LLMs, OpenAI, Anthropic, Google Gemini, and custom providers
+- Built with Node.js, TypeScript, and npm ecosystem
 
-# Code Organization Rules
-- The project follows a modular structure with clear separation of concerns.
-- Source code is in `src/` directory with the main functionality in `src/scripts/`.
-- Utilities and shared code are in `src/utils/` directory.
-- LLM provider implementations are in `src/utils/llm/` directory.
-- Templates and prompt files are in `templates/` directory.
-- Documentation is in `documents/` directory.
+## Code Organization
+- Source code in `src/` directory with main functionality in `src/scripts/`
+- Utilities and shared code in `src/utils/` directory
+- LLM provider implementations in `src/utils/llm/` directory
+- Templates and prompt files in `templates/` directory
+- Documentation in `_docs/` directory
+- Tests in `tests/` directory
 
-# LLM Architecture Rules
-- The `BaseLLMClient` class in `src/utils/llm/base-llm-client.ts` defines the interface for all LLM providers.
-- Each provider is implemented as a separate class that extends `BaseLLMClient`.
-- The `LLMClientFactory` in `src/utils/llm/llm-client-factory.ts` provides a factory pattern for creating LLM clients.
-- Configuration is loaded from environment variables in `.env` file.
-- When suggesting changes to LLM integration, maintain consistent error handling and logging patterns.
+## LLM Architecture
+- `BaseLLMClient` class in `src/utils/llm/base-llm-client.ts` defines interface for all providers
+- Each provider implemented as separate class extending `BaseLLMClient`
+- `LLMClientFactory` in `src/utils/llm/llm-client-factory.ts` provides factory pattern
+- Configuration loaded from environment variables in `.env` file
+- Maintain consistent error handling and logging patterns across providers
 
-# Code Style Rules
-- Follow TypeScript best practices with proper typing.
-- Maintain consistent error handling throughout the codebase.
-- Include JSDoc comments for public APIs and complex functions.
-- Use async/await for asynchronous operations rather than Promises.
-- Follow existing patterns for logging and error reporting.
+## TypeScript Development Rules
+- Follow TypeScript best practices with strict typing
+- Use `ts-node` for development and testing
+- Maintain consistent error handling throughout codebase
+- Include JSDoc comments for public APIs and complex functions
+- Use async/await for asynchronous operations
+- Follow existing patterns for logging and error reporting
 
-# Feature Enhancement Rules
-- When adding new features, follow the existing architecture patterns.
-- New LLM providers should implement the `BaseLLMClient` interface.
-- Update documentation in the `documents/` directory when adding new features.
-- Update the `.env.example` file when adding new configuration options.
-- Add tests for new features in the `tests/` directory.
+## Build and Development Workflow
+- Use `npm run build` to compile TypeScript to JavaScript
+- Use `npm run lint` to check TypeScript code quality
+- Use `npm run dev` for development mode with ts-node
+- Use `npm test` to run test suite
+- Use `ts-node` to run scripts directly during development
 
-# Testing Rules
-- The project has testing utilities in the `tests/` directory.
-- Use `tests/scripts/test-llm-providers.ts` for testing LLM provider integration.
-- Follow existing patterns for writing new tests.
-- Ensure tests are comprehensive and cover error cases.
+## Feature Enhancement Rules
+- Follow existing architecture patterns when adding new features
+- New LLM providers must implement `BaseLLMClient` interface
+- Update documentation in `_docs/` directory when adding features
+- Update `.env.example` file when adding configuration options
+- Add tests for new features in `tests/` directory
 
-# Command Line Interface Rules
-- CLI tools should provide clear usage instructions and error messages.
-- Follow existing patterns for handling command line arguments.
-- Maintain backward compatibility for existing command line interfaces.
+## Testing Rules
+- Use `tests/scripts/test-llm-providers.ts` for testing LLM provider integration
+- Use `tests/scripts/test-provider.ts` for testing individual providers
+- Follow existing patterns for writing tests
+- Ensure tests are comprehensive and cover error cases
+- Test all LLM providers when making changes to base classes
 
-# Environment Configuration Rules
-- The project uses `.env` file for configuration.
-- Reference `.env.example` for available configuration options.
-- Required environment variables should be well-documented.
-- Provide sensible defaults where possible.
+## Command Line Interface Rules
+- CLI tools should provide clear usage instructions and error messages
+- Follow existing patterns for handling command line arguments
+- Maintain backward compatibility for existing CLI interfaces
+- Use TypeScript for all CLI scripts
 
-# Documentation Rules
-- Keep documentation in the `documents/` directory up-to-date.
-- Follow Markdown formatting for documentation files.
-- Include usage examples in documentation.
-- Document configuration options and environment variables. 
+## Environment Configuration Rules
+- Use `.env` file for configuration (copy from `.env.example`)
+- Reference `.env.example` for available configuration options
+- Required environment variables should be well-documented
+- Provide sensible defaults where possible
+- Support multiple LLM providers with different API keys
+
+## Documentation Rules
+- Keep documentation in `_docs/` directory up-to-date
+- Follow Markdown formatting for documentation files
+- Include usage examples in documentation
+- Document configuration options and environment variables
+- Update README.md with new features and changes
+
+## Agent Workflow Rules
+- Follow agent-driven development workflow for automatic build/test cycles
+- Use npm commands for build, test, and lint operations
+- Test LLM providers after code changes that affect LLM integration
+- Monitor build logs and test results for quality assurance
+- Report status and next steps clearly to users 

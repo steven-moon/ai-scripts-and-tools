@@ -1,0 +1,17 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+- Use **GitHub-flavoured Markdown** with hard-wrapped lines ≤ 120 chars.
+- Start every document with an H1 heading and end with an `---` separator followed by `*Last updated: {{date}}*`.
+- Reference external web sources in-line with standard markdown links and include footnotes if multiple citations are needed. Example: `[Cursor Rules](mdc:https:/docs.cursor.com/context/rules)`.
+- For internal code references use Cursor-style code citations:
+  ```12:34:Sources/MLXLLMEngine/InferenceEngine.swift
+  // ... existing code ...
+  ```
+- Keep section hierarchy predictable: H2 for major sections, H3 for subsections. Avoid skipping levels.
+- Use fenced code blocks annotated with the correct language (`swift`, `bash`, `json` etc.).
+- Prefer bullet points or tables over long paragraphs for lists of requirements or tasks.
+- Update the **`Last updated`** timestamp whenever substantive edits are made.
+- Do **not** store generated docs in source control if they exceed 1,000 lines; split into logical smaller files instead.

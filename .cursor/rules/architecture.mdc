@@ -1,0 +1,16 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+- Expose **only** the following first-class public types: `ModelConfiguration`, `LLMEngine` (protocol), concrete `InferenceEngine`, and `ChatSession`.
+- Keep **model download** concerns isolated in `ModelDownloader` and **never** sprinkled across other files.
+- All async work must leverage **Swift Concurrency** (`async/await`, `AsyncSequence`). Avoid legacy callbacks except for bridging (e.g. a `(Double) -> Void` progress parameter that is *Sendable*).
+- Provide **streaming generation** via `AsyncThrowingStream<String>` and one-shot completion that internally consumes that stream.
+- Enforce GPU memory safety:
+  - Call `MLX.GPU.set(cacheLimit:)` *before* model load (default ≤ 512 MB).
+  - Implement `unload()` on the concrete engine to release Metal buffers when memory warnings arrive.
+- Detect the **iOS Simulator** with `#if targetEnvironment(simulator)` and surface the `SimulatorNotSupported` error (or provide a mock engine).
+- Maintain a **`ModelRegistry.swift`** file with static well-known model configs. Custom models can be injected at runtime—do *not* hard-code IDs elsewhere.
+- Every new feature (e.g. LoRA adapters) must land behind a **feature-flag** enum in `LLMEngine.Features` to avoid source breaks.
+- Unit tests must exercise the *public API* only—internal helpers are tested indirectly. Use the `MockLLMEngine` for simulator CI.

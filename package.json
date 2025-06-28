@@ -7,9 +7,12 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "ts-node src/index.ts",
-    "script": "ts-node src/scripts/$1",
     "lint": "tsc --noEmit",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "clean": "rm -rf dist node_modules/.cache",
+    "commit": "ts-node src/scripts/generate-git-commit.ts",
+    "summary": "ts-node src/scripts/generate-code-summary.ts",
+    "test-llm": "ts-node tests/scripts/test-llm-providers.ts"
   },
   "repository": {
     "type": "git",
